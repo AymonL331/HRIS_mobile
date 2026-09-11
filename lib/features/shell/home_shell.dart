@@ -6,6 +6,10 @@ import '../../core/location/location_fix.dart';
 import '../attendance/attendance_api.dart';
 import '../attendance/attendance_controller.dart';
 import '../attendance/attendance_screen.dart';
+import '../attendance/attendance_tab.dart';
+import '../attendance/team_api.dart';
+import '../attendance/team_controller.dart';
+import '../attendance/team_screen.dart';
 import '../auth/change_password_screen.dart';
 import '../settings/settings_screen.dart';
 import '../time_clock/clock_api.dart';
@@ -25,16 +29,26 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
-  static const _titles = ['Time Clock', 'My Attendance', 'Settings'];
-
   @override
   Widget build(BuildContext context) {
     // A login with no employee (a Super Admin, a special account) has nothing to
-    // clock and no DTR; both tabs say so instead of firing calls that 404.
-    final hasEmployee = context.watch<SessionController>().user?.employeeId != null;
+    // clock; the tab says so instead of firing calls that 404. The Attendance
+    // tab depends on TWO things: an employee record (my own DTR) and the
+    // attendance:view grant (everyone's DTR, read-only) — any combination.
+    final user = context.watch<SessionController>().user;
+    final hasEmployee = user?.employeeId != null;
+    final canTeam = user?.canViewTeamAttendance ?? false;
+    final titles = ['Time Clock', canTeam ? 'Attendance' : 'My Attendance', 'Settings'];
+    final Widget attendance = hasEmployee && canTeam
+        ? const AttendanceTab()
+        : canTeam
+            ? const TeamAttendanceScreen()
+            : hasEmployee
+                ? const AttendanceScreen()
+                : const NoEmployeeScreen(what: 'attendance record');
     final pages = <Widget>[
       hasEmployee ? const TimeClockScreen() : const NoEmployeeScreen(what: 'time clock'),
-      hasEmployee ? const AttendanceScreen() : const NoEmployeeScreen(what: 'attendance record'),
+      attendance,
       SettingsScreen(
         onChangePassword: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const ChangePasswordScreen(forced: false)),
@@ -54,9 +68,15 @@ class _HomeShellState extends State<HomeShell> {
             api: ctx.read<AttendanceApi?>() ?? MobileAttendanceApi(ctx.read<SessionController>()),
           ),
         ),
+        // Lazy (provider default): created only when the team view first reads it.
+        ChangeNotifierProvider<TeamAttendanceController>(
+          create: (ctx) => TeamAttendanceController(
+            api: ctx.read<TeamAttendanceApi?>() ?? MobileTeamAttendanceApi(ctx.read<SessionController>()),
+          ),
+        ),
       ],
       child: Scaffold(
-        appBar: AppBar(title: Text(_titles[_index])),
+        appBar: AppBar(title: Text(titles[_index])),
         body: IndexedStack(index: _index, children: pages),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _index,

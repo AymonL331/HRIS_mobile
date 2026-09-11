@@ -10,6 +10,14 @@ class User {
   final bool mustChangePassword;
   final bool mobileAccessEnabled;
 
+  /// The role's grants as `module:action` strings, exactly as the server sends
+  /// them. Used only to decide what to SHOW — the server's `authorize` is the
+  /// real gate on every call. A Super Admin's list is empty (the role bypasses
+  /// every gate by name), so the role name is checked alongside it.
+  final List<String> permissions;
+
+  static const superAdminRole = 'Super Admin';
+
   const User({
     required this.id,
     required this.tenantId,
@@ -19,6 +27,7 @@ class User {
     required this.roleName,
     required this.mustChangePassword,
     required this.mobileAccessEnabled,
+    this.permissions = const [],
   });
 
   factory User.fromJson(Map<String, dynamic> j) => User(
@@ -30,7 +39,16 @@ class User {
         roleName: j['role_name'] as String?,
         mustChangePassword: _flag(j['must_change_password']),
         mobileAccessEnabled: _flag(j['mobile_access_enabled']),
+        permissions: (j['permissions'] as List?)?.map((e) => '$e').toList(growable: false) ?? const [],
       );
+
+  bool get isSuperAdmin => roleName == superAdminRole;
+
+  bool can(String permission) => isSuperAdmin || permissions.contains(permission);
+
+  /// May this login open the team DTR ("Everyone" on the Attendance tab)? The
+  /// same grant the web console's DTR needs; the server re-checks it.
+  bool get canViewTeamAttendance => can('attendance:view');
 
   User copyWith({bool? mustChangePassword}) => User(
         id: id,
@@ -41,6 +59,7 @@ class User {
         roleName: roleName,
         mustChangePassword: mustChangePassword ?? this.mustChangePassword,
         mobileAccessEnabled: mobileAccessEnabled,
+        permissions: permissions,
       );
 
   static int? _int(Object? v) => v == null ? null : (v is int ? v : int.tryParse('$v'));

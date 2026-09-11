@@ -25,6 +25,20 @@ attendance itself.
 On the Android emulator, the host PC is `10.0.2.2`: set Sandbox to `http://10.0.2.2:5001`
 under Login › Advanced to hit a sandbox server running on the PC (debug builds only).
 
+## Who sees what
+
+| Login | Time Clock | Attendance tab |
+|---|---|---|
+| Employee (mobile switch on) | clock in / out | **Mine** — own DTR, month by month |
+| HR-type employee (`attendance:view`) | clock in / out | **Mine / Everyone** switch |
+| Super Admin or special account with `attendance:view` | "No employee record" | **Everyone** — the team DTR for a day |
+
+"Everyone" is read-only and is the only console route a mobile token may reach
+(`GET /api/attendance/calendar`, still behind the same permission and branch
+scope as the website). Pick a day, search by name or code, page through a big
+roster; each person shows their badge, punches, place labels and chips (late,
+undertime, mobile app, out of range). No coordinates are shown on the phone.
+
 Change the compiled defaults at build time:
 
 ```powershell

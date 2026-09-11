@@ -9,4 +9,9 @@ abstract final class Endpoints {
   static const mobileClock = '/api/me/mobile-clock';
   static const locationConsent = '/api/me/location-consent';
   static const attendanceCalendar = '/api/me/attendance/calendar';
+
+  /// The ONE console route a mobile token may read: the team DTR, for a login
+  /// that holds attendance:view. GET only; the server refuses everything else
+  /// under /api/attendance with MOBILE_SCOPE.
+  static const teamCalendar = '/api/attendance/calendar';
 }
