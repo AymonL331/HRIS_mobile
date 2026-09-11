@@ -1,18 +1,16 @@
 /// Which HRIS backend the app talks to.
 ///
 /// `main` and `sandbox` are the two the user picks on the login screen — the
-/// same split as the web app (real HRIS vs the hris_test sandbox). `emulator`
-/// is a debug-only preset: inside the Android emulator "localhost" is the
-/// emulator itself, and the host PC is reachable as 10.0.2.2.
+/// same split as the web app (real HRIS vs the hris_test sandbox). There is
+/// deliberately no third preset: on the Android emulator, point Sandbox at
+/// `http://10.0.2.2:5001` from Login › Advanced (10.0.2.2 is the host PC).
 enum AppEnv {
   main,
-  sandbox,
-  emulator;
+  sandbox;
 
   String get label => switch (this) {
         AppEnv.main => 'Main HRIS',
         AppEnv.sandbox => 'Sandbox',
-        AppEnv.emulator => 'Emulator',
       };
 
   static AppEnv parse(String? raw) => AppEnv.values.firstWhere(
@@ -35,8 +33,6 @@ class EnvConfig {
     'HRIS_SANDBOX_URL',
     defaultValue: 'https://turbine-chamomile-financial.ngrok-free.dev',
   );
-  static const emulatorUrl = 'http://10.0.2.2:5001';
-
   final AppEnv selected;
   final String mainUrl;
   final String sandboxUrl;
@@ -56,7 +52,6 @@ class EnvConfig {
   String get baseUrl => switch (selected) {
         AppEnv.main => mainUrl,
         AppEnv.sandbox => sandboxUrl,
-        AppEnv.emulator => emulatorUrl,
       };
 
   /// Suffix for anything stored per environment (the session token above all),

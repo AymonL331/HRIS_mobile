@@ -21,7 +21,9 @@ attendance itself.
 |---|---|---|
 | Main HRIS | `http://192.168.137.1:5000` (the dev PC's hotspot, for now) | yes — Login › Advanced |
 | Sandbox | `https://turbine-chamomile-financial.ngrok-free.dev` | yes |
-| Emulator (debug builds only) | `http://10.0.2.2:5001` | no |
+
+On the Android emulator, the host PC is `10.0.2.2`: set Sandbox to `http://10.0.2.2:5001`
+under Login › Advanced to hit a sandbox server running on the PC (debug builds only).
 
 Change the compiled defaults at build time:
 

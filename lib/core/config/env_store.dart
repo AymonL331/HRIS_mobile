@@ -22,10 +22,9 @@ class EnvStore extends ChangeNotifier {
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    var selected = AppEnv.parse(prefs.getString(_kSelected));
-    // The emulator preset is a debug convenience; a release build that somehow
-    // stored it falls back to Main rather than pointing at 10.0.2.2.
-    if (selected == AppEnv.emulator && kReleaseMode) selected = AppEnv.main;
+    // A stored value the enum no longer has (e.g. the retired "emulator"
+    // preset) parses to Main.
+    final selected = AppEnv.parse(prefs.getString(_kSelected));
     _config = EnvConfig(
       selected: selected,
       mainUrl: EnvConfig.normalizeUrl(prefs.getString(_kMainUrl) ?? '') ?? EnvConfig.defaultMainUrl,

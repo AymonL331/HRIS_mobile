@@ -10,7 +10,7 @@ void main() {
       expect(c.selected, AppEnv.main);
       expect(c.baseUrl, 'http://192.168.137.1:5000');
       expect(c.copyWith(selected: AppEnv.sandbox).baseUrl, 'https://turbine-chamomile-financial.ngrok-free.dev');
-      expect(c.copyWith(selected: AppEnv.emulator).baseUrl, 'http://10.0.2.2:5001');
+      expect(AppEnv.values, [AppEnv.main, AppEnv.sandbox]);
     });
 
     test('storageKey is per environment', () {
@@ -36,6 +36,7 @@ void main() {
     test('AppEnv.parse falls back to main', () {
       expect(AppEnv.parse('sandbox'), AppEnv.sandbox);
       expect(AppEnv.parse('garbage'), AppEnv.main);
+      expect(AppEnv.parse('emulator'), AppEnv.main, reason: 'retired preset');
       expect(AppEnv.parse(null), AppEnv.main);
     });
   });

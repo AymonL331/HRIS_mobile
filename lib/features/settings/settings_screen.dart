@@ -31,7 +31,7 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _switchEnv(BuildContext context) async {
     final current = context.read<EnvStore>().config.selected;
-    final envs = [AppEnv.main, AppEnv.sandbox, if (kDebugMode) AppEnv.emulator];
+    const envs = AppEnv.values;
     final target = await showDialog<AppEnv>(
       context: context,
       builder: (ctx) => SimpleDialog(

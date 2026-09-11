@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -81,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final envStore = context.watch<EnvStore>();
     final selected = envStore.config.selected;
     final reason = session.state is SignedOut ? (session.state as SignedOut).reason : null;
-    final envs = [AppEnv.main, AppEnv.sandbox, if (kDebugMode) AppEnv.emulator];
+    const envs = AppEnv.values;
 
     return Scaffold(
       body: SafeArea(
