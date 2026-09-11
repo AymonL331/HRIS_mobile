@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG builds only (this file shadows main/res/xml in the debug source set):
+  additionally allows the Android emulator's alias for the host PC (10.0.2.2),
+  so `flutter run` on the emulator can reach a server on localhost.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.137.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

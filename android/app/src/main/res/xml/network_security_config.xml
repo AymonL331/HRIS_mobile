@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP is OFF by default (Android 9+). The ONLY exception is the
+  development PC's hotspot address, so a phone on the hotspot can reach the API
+  before a public HTTPS host exists. Remove that entry once the production URL
+  is in place; never set usesCleartextTraffic="true" on the application.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.137.1</domain>
+    </domain-config>
+</network-security-config>
