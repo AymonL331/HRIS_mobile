@@ -11,6 +11,7 @@ import '../settings/settings_screen.dart';
 import '../time_clock/clock_api.dart';
 import '../time_clock/time_clock_controller.dart';
 import '../time_clock/time_clock_screen.dart';
+import 'no_employee_screen.dart';
 
 /// The signed-in shell: three tabs. The Time Clock controller lives here so
 /// switching tabs keeps its state (the last outcome, the last fix).
@@ -28,9 +29,12 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // A login with no employee (a Super Admin, a special account) has nothing to
+    // clock and no DTR; both tabs say so instead of firing calls that 404.
+    final hasEmployee = context.watch<SessionController>().user?.employeeId != null;
     final pages = <Widget>[
-      const TimeClockScreen(),
-      const AttendanceScreen(),
+      hasEmployee ? const TimeClockScreen() : const NoEmployeeScreen(what: 'time clock'),
+      hasEmployee ? const AttendanceScreen() : const NoEmployeeScreen(what: 'attendance record'),
       SettingsScreen(
         onChangePassword: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const ChangePasswordScreen(forced: false)),
