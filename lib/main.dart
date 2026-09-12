@@ -9,6 +9,7 @@ import 'core/config/env_store.dart';
 import 'core/location/location_fix.dart';
 import 'core/location/location_gate_service.dart';
 import 'features/attendance/attendance_api.dart';
+import 'features/payslips/payslip_api.dart';
 import 'features/time_clock/clock_api.dart';
 
 Future<void> main() async {
@@ -38,6 +39,7 @@ Future<void> main() async {
         // inject a fake here instead.
         Provider<ClockApi?>.value(value: null),
         Provider<AttendanceApi?>.value(value: null),
+        Provider<PayslipApi?>.value(value: null),
       ],
       child: const HrisApp(),
     ),
