@@ -1,10 +1,11 @@
 # HRIS Mobile
 
-The employee time-clock app for the HRIS. Branch employees sign in with the same
-credentials as the website and clock in / out from their own phone. **Location is
-mandatory**: the app does not run while the phone's location is off, the
-permission is missing, or the accuracy is set to Approximate, and every punch
-takes a fresh GPS fix that the server checks against the branch worksite.
+The employee self-service app for the HRIS. Branch employees sign in with the same
+credentials as the website, clock in / out from their own phone, read their own
+DTR and read their own payslips. **Location is mandatory**: the app does not run
+while the phone's location is off, the permission is missing, or the accuracy is
+set to Approximate, and every punch takes a fresh GPS fix that the server checks
+against the branch worksite.
 
 Only accounts HR has switched on (**Employee profile › Account › Mobile app**)
 can sign in. Turning the switch off signs the phone out on its next request.
@@ -13,9 +14,18 @@ can sign in. Turning the switch off signs the phone out on its next request.
 
 The same Node/Express API as the web app — no direct database access. It uses the
 mobile-only endpoints added by migrations 057/058 (`/api/me/mobile-clock`,
-`/api/me/mobile-clock/status`) plus `/api/auth/*`, `/api/me/location-consent` and
-`/api/me/attendance/calendar`. The server holds every rule; the app never grades
-attendance itself.
+`/api/me/mobile-clock/status`) plus `/api/auth/*`, `/api/me/location-consent`,
+`/api/me/attendance/calendar` and `/api/me/payslips` (`/:id`, `/:id/breakdown`).
+The server holds every rule; the app never grades attendance and never computes a
+peso figure itself — My Payslips renders what payroll already paid, and the
+"How this was computed" working is built server-side by the same function that
+priced the run.
+
+Everything under `/api/me/` is **ownership-scoped by the server**: `resolveSelf`
+resolves the employee from the signed-in ACCOUNT, never from a request parameter,
+so there is no id for the app to pass and none to tamper with. Adding My Payslips
+therefore needed no server change — those routes were already inside the mobile
+token's `/api/me/` window.
 
 | Environment | Default address | Editable in app |
 |---|---|---|
@@ -27,11 +37,17 @@ under Login › Advanced to hit a sandbox server running on the PC (debug builds
 
 ## Who sees what
 
-| Login | Time Clock | Attendance tab |
-|---|---|---|
-| Employee (mobile switch on) | clock in / out | **Mine** — own DTR, month by month |
-| HR-type employee (`attendance:view`) | clock in / out | **Mine / Everyone** switch |
-| Super Admin or special account with `attendance:view` | "No employee record" | **Everyone** — the team DTR for a day |
+| Login | Time Clock | Attendance | My Payslips |
+|---|---|---|---|
+| Employee (mobile switch on) | clock in / out | **Mine** — own DTR, month by month | own payslips |
+| HR-type employee (`attendance:view`) | clock in / out | **Mine / Everyone** switch | own payslips |
+| Super Admin or special account with `attendance:view` | "No employee record" | **Everyone** — the team DTR for a day | "No employee record" |
+
+My Payslips is the phone's copy of the website's **My Payslips** — the same list,
+the same detail (status, the four figures, the employee-share statutory
+contributions, the itemised lines grouped by category) and the same *How this was
+computed* working. It is read-only, and a payslip that is not yours is a 404 on
+the server, so the app can never enumerate anybody else's.
 
 "Everyone" is read-only and is the only console route a mobile token may reach
 (`GET /api/attendance/calendar`, still behind the same permission and branch
@@ -78,6 +94,13 @@ the soft shadow), `StatusBadge` (the five-tone pill, with the DTR tone mapping f
 `HrisTokens.of(context)`, never `extension<HrisTokens>()!` — the widget tests mount
 screens under a bare `MaterialApp`.
 
+Navigation is the website's **sidebar**, behind the top bar's menu button:
+`lib/features/shell/app_drawer.dart` draws `Sidebar.module.css` — the brand block
+over its hairline, the signed-in account, uppercase section labels, and the active
+item in primary-soft with primary text (`.itemActive`). It replaced the three
+bottom tabs when My Payslips made a fourth destination: a tab bar stops scaling
+there, and the sidebar is the shape this product already has in the browser.
+
 The launcher icon and splash come from the same mark: `tool/brand/make_icons.ps1`
 draws the sources into `assets/brand/`, `dart run flutter_launcher_icons` builds the
 adaptive icon, and `android/app/src/main/res/values*/splash_colors.xml` carries the
@@ -113,9 +136,10 @@ increase for an in-place update).
 ```
 lib/
   core/      config (environments), http (API client + typed errors), auth (session),
-             location (gate + fixes), time (Manila time, server clock)
+             location (gate + fixes), time (Manila time, server clock),
+             format (money, the web's formatMoney/exactRate)
   features/  auth (login, change password), consent, time_clock, attendance,
-             settings, shell (tabs + the location gate)
+             payslips, settings, shell (the sidebar + the location gate)
   shared/    theme, widgets
 test/        unit + widget tests (flutter test)
 ```

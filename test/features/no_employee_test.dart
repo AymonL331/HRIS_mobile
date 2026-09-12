@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hris_mobile/app.dart';
 import 'package:hris_mobile/core/auth/session_controller.dart';
@@ -50,19 +51,31 @@ void main() {
     await session.login(companyCode: 'headoffice', identifier: 'admin', password: 'x');
     await tester.pumpAndSettle();
 
+    // Navigation is the sidebar now, so each destination is a drawer trip.
+    Future<void> go(String label) async {
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+    }
+
     expect(find.text('No employee record'), findsOneWidget);
     expect(api.statusCalls, 0); // nothing was asked of the clock API
-    await tester.tap(find.text('Attendance'));
-    await tester.pumpAndSettle();
+    await go('Attendance');
     // A Super Admin holds every grant: the tab is the team DTR, not a dead end.
     expect(find.text('No employee record'), findsNothing);
     expect(find.text('Search name or employee code'), findsOneWidget);
     expect(find.text('No employees to show for this day.'), findsOneWidget);
     expect(team.calls.length, 1);
     expect(find.text('Mine'), findsNothing); // no own DTR to switch to
-    await tester.tap(find.text('Settings'));
-    await tester.pumpAndSettle();
+
+    // My Payslips is the same story: no employee, so no `/api/me/payslips` call
+    // to 404 — the page says so instead.
+    await go('My Payslips');
+    expect(find.text('No employee record'), findsOneWidget);
+
+    await go('Settings');
     expect(find.text('Change password'), findsOneWidget);
-    expect(find.text('admin'), findsOneWidget);
+    expect(find.text('admin'), findsWidgets);
   });
 }
