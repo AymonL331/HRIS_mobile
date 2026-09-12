@@ -42,7 +42,7 @@ class AppRoot extends StatelessWidget {
       // The server refuses every other route until this password is replaced,
       // so the screen stands in for the shell (outside the location gate — a
       // password needs no GPS).
-      MustChangePassword() => const ChangePasswordScreen(forced: true),
+      MustChangePassword() => const ChangePasswordScreen(),
       // Everything a signed-in user can see sits behind the location gate.
       SignedIn() => const LocationGate(child: HomeShell()),
     };

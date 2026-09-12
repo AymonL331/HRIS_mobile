@@ -36,6 +36,21 @@ token's `/api/me/` window.
 On the Android emulator, the host PC is `10.0.2.2`: set Sandbox to `http://10.0.2.2:5001`
 under Login › Advanced to hit a sandbox server running on the PC (debug builds only).
 
+## Passwords
+
+There is **no self-service change-password in the app**. A reset starts with HR on
+the website: Employee → Account → **Reset password**, which has the server generate
+a temporary password and show it once. HR hands it over; the employee signs in with
+it (on either surface) and is then forced to choose their own before anything else
+works — the server refuses every other route with `PASSWORD_CHANGE_REQUIRED` until
+they do.
+
+It is one `users.password_hash` behind both surfaces, so there is nothing to sync:
+a password chosen on the phone works on the website immediately, and one chosen on
+the website works on the phone. Offering a second, voluntary "change password" on
+the phone would be a weaker door to the same credential, bypassing the handover the
+flow is built around — so the app only points at the real route.
+
 ## The face check
 
 Every punch is face-verified (2026-09-13). Tapping **Time In** or **Time Out** takes
@@ -175,7 +190,7 @@ lib/
   core/      config (environments), http (API client + typed errors), auth (session),
              location (gate + fixes), time (Manila time, server clock),
              format (money, the web's formatMoney/exactRate)
-  features/  auth (login, change password), consent, time_clock, attendance,
+  features/  auth (login, forced password change), consent, time_clock, attendance,
              payslips, face (the capture screen + its loopback asset server),
              settings, shell (the sidebar + the location gate)
   shared/    theme, widgets

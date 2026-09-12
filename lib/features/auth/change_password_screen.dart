@@ -23,20 +23,26 @@ Map<String, String> validateChangePassword({required String current, required St
   return errors;
 }
 
-/// Change the signed-in account's password.
+/// The FORCED password change — the only way a password is set on the phone.
 ///
-/// Two modes, one screen. FORCED: the server refuses every other route until a
-/// provisioned or admin-reset password is replaced (`PASSWORD_CHANGE_REQUIRED`),
-/// so the root shows this instead of the shell, with sign-out as the only other
-/// way off it. VOLUNTARY: pushed from Settings, pops on success.
+/// There is deliberately no voluntary "change password" anywhere in the app.
+/// A reset starts with HR: they reset the login on the website, the server
+/// issues a temporary password (`must_change_password = 1`), and it is handed
+/// to the employee. The server then refuses every other route with
+/// `PASSWORD_CHANGE_REQUIRED` until it is replaced, so the app's root shows
+/// this screen instead of the shell, with sign-out as the only other way off
+/// it. The employee types the temporary password as "current", chooses their
+/// own, and confirms it.
+///
+/// This is the SAME `users.password_hash` the website authenticates against —
+/// one credential, two surfaces. A password chosen here works on the website
+/// immediately, and one chosen on the website works here, with nothing to sync.
 ///
 /// The server re-verifies the current password and applies the 8–72 rule; the
 /// same rules are checked here first so the common mistakes never cost a round
 /// trip. On success the SAME token keeps working (the gate is on the user row).
 class ChangePasswordScreen extends StatefulWidget {
-  final bool forced;
-
-  const ChangePasswordScreen({super.key, required this.forced});
+  const ChangePasswordScreen({super.key});
 
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
@@ -76,11 +82,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             body: {'current_password': _current.text, 'new_password': _next.text},
           ));
       if (!mounted) return;
+      // No pop and no snackbar: clearing the flag flips the app root from this
+      // screen to the shell, which is the confirmation.
       session.markPasswordChanged();
-      if (!widget.forced) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed.')));
-        Navigator.of(context).pop();
-      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -101,10 +105,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Change password'),
-        automaticallyImplyLeading: !widget.forced,
+        // No back arrow: there is nowhere to go back TO until the password is
+        // replaced. Signing out is the only other way off this screen.
+        automaticallyImplyLeading: false,
         actions: [
-          if (widget.forced)
-            TextButton(onPressed: _busy ? null : () => session.logout(), child: const Text('Sign out')),
+          TextButton(onPressed: _busy ? null : () => session.logout(), child: const Text('Sign out')),
         ],
       ),
       // The web ChangePasswordPage: the same auth card as the login.
@@ -118,12 +123,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (widget.forced) ...[
-                  const MessageBanner.info(
-                    'This password was set for you. Choose your own before using the app — it is the same password as the HRIS website.',
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                const MessageBanner.info(
+                  'This password was set for you by HR. Choose your own before using the app — it is the '
+                  'same password as the HRIS website, so it changes there too.',
+                ),
+                const SizedBox(height: 16),
                 if (_error != null) ...[
                   MessageBanner.error(_error!),
                   const SizedBox(height: 12),

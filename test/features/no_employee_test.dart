@@ -75,7 +75,12 @@ void main() {
     expect(find.text('No employee record'), findsOneWidget);
 
     await go('Settings');
-    expect(find.text('Change password'), findsOneWidget);
     expect(find.text('admin'), findsWidgets);
+    // Settings explains where a password reset comes from; it does NOT offer a
+    // self-service change. HR resets the login, the server issues a temporary
+    // password, and the holder replaces it through the forced screen.
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.textContaining('ask HR'), findsOneWidget);
+    expect(find.text('Change password'), findsNothing);
   });
 }

@@ -14,7 +14,6 @@ import '../attendance/attendance_tab.dart';
 import '../attendance/team_api.dart';
 import '../attendance/team_controller.dart';
 import '../attendance/team_screen.dart';
-import '../auth/change_password_screen.dart';
 import '../payslips/payslip_api.dart';
 import '../payslips/payslips_controller.dart';
 import '../payslips/payslips_screen.dart';
@@ -66,11 +65,7 @@ class _HomeShellState extends State<HomeShell> {
       hasEmployee ? const TimeClockScreen() : const NoEmployeeScreen(what: 'time clock'),
       attendance,
       hasEmployee ? const PayslipsScreen() : const NoEmployeeScreen(what: 'payslip'),
-      SettingsScreen(
-        onChangePassword: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const ChangePasswordScreen(forced: false)),
-        ),
-      ),
+      const SettingsScreen(),
     ];
     final sections = [
       NavSection('Self-Service', [

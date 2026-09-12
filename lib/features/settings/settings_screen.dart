@@ -10,11 +10,12 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/page_header.dart';
 
 /// Who is signed in, where the app is pointed, the version, and the way out.
+///
+/// Deliberately carries NO change-password action: a password reset starts with
+/// HR issuing a temporary credential, and the holder replaces it through the
+/// forced screen on their next sign-in. See the Password tile below.
 class SettingsScreen extends StatelessWidget {
-  /// Pushes the voluntary change-password screen (wired by the shell).
-  final VoidCallback? onChangePassword;
-
-  const SettingsScreen({super.key, this.onChangePassword});
+  const SettingsScreen({super.key});
 
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
@@ -101,12 +102,21 @@ class SettingsScreen extends StatelessWidget {
             title: Text(user?.username ?? '—'),
             subtitle: Text([if (tenant != null) tenant.name, if (user?.email.isNotEmpty ?? false) user!.email].join(' · ')),
           ),
-          ListTile(
-            leading: const Icon(Icons.password_outlined),
-            title: const Text('Change password'),
-            enabled: onChangePassword != null,
-            subtitle: const Text('Same password as the HRIS website'),
-            onTap: onChangePassword,
+          // NOT a button. Changing a password starts with HR, not with the
+          // holder: they reset the login, the server issues a temporary
+          // password, and the employee replaces it on their next sign-in
+          // (`must_change_password`). Offering a self-service "change" here
+          // would be a second, weaker door to the same credential — one that
+          // skips the handover the whole flow is built around. So this tile
+          // only says where the real route is.
+          const ListTile(
+            leading: Icon(Icons.password_outlined),
+            title: Text('Password'),
+            subtitle: Text(
+              'The same password as the HRIS website. To reset it, ask HR — they issue a temporary '
+              'password, and you choose your own the next time you sign in here or on the website.',
+            ),
+            isThreeLine: true,
           ),
         ]),
         const SectionLabel('Environment'),
