@@ -74,6 +74,42 @@ class TodayPunches {
       );
 }
 
+/// The face gate, as the server describes it (`face` block).
+///
+/// [required] is sent as a constant `true` by the server, deliberately: the app
+/// must never read "not enrolled" as "then I may punch without a face". When
+/// [enrolled] is false the employee cannot clock at all until HR enrols them,
+/// and the home screen says so instead of letting them reach a camera that will
+/// be refused.
+class FaceGate {
+  final bool required;
+  final bool enrolled;
+  final String modelVersion;
+  final List<String> livenessChallenges;
+
+  const FaceGate({
+    required this.required,
+    required this.enrolled,
+    required this.modelVersion,
+    required this.livenessChallenges,
+  });
+
+  factory FaceGate.fromJson(Map<String, dynamic>? j) => j == null
+      // A server that predates the face gate. Treated as "not required" so an
+      // older deployment keeps working rather than bricking every punch.
+      ? const FaceGate(required: false, enrolled: false, modelVersion: '', livenessChallenges: [])
+      : FaceGate(
+          required: _flag(j['required']),
+          enrolled: _flag(j['enrolled']),
+          modelVersion: (j['model_version'] ?? '') as String,
+          livenessChallenges:
+              ((j['liveness_challenges'] as List?) ?? const []).map((e) => '$e').toList(growable: false),
+        );
+
+  /// May this employee punch right now, as far as the face gate is concerned?
+  bool get canPunch => !required || enrolled;
+}
+
 /// `GET /api/me/mobile-clock/status`.
 class ClockStatus {
   final DateTime serverTime;
@@ -85,6 +121,7 @@ class ClockStatus {
   final TodayPunches? today;
   final Worksite worksite;
   final bool consentGiven;
+  final FaceGate face;
 
   const ClockStatus({
     required this.serverTime,
@@ -96,6 +133,7 @@ class ClockStatus {
     required this.today,
     required this.worksite,
     required this.consentGiven,
+    required this.face,
   });
 
   bool get canClockIn => today == null || today!.clockInAt == null;
@@ -115,6 +153,7 @@ class ClockStatus {
       today: today is Map<String, dynamic> ? TodayPunches.fromJson(today) : null,
       worksite: Worksite.fromJson(j['worksite'] as Map<String, dynamic>?),
       consentGiven: _flag(consent['consent_given']),
+      face: FaceGate.fromJson(j['face'] as Map<String, dynamic>?),
     );
   }
 }
@@ -131,6 +170,11 @@ class PunchResponse {
   final bool? within;
   final int? radiusM;
 
+  /// How close the submitted face was to the enrolled template, as the SERVER
+  /// measured it. Present on a face-verified punch; kept so the success card can
+  /// say the punch was face-verified rather than merely claiming it.
+  final double? matchDistance;
+
   const PunchResponse({
     required this.direction,
     required this.clockInAt,
@@ -141,7 +185,10 @@ class PunchResponse {
     required this.distanceM,
     required this.within,
     required this.radiusM,
+    required this.matchDistance,
   });
+
+  bool get faceVerified => matchDistance != null;
 
   DateTime? get stampedAt => direction == 'in' ? clockInAt : clockOutAt;
 
@@ -158,6 +205,7 @@ class PunchResponse {
       distanceM: _int(ws?['distance_m']),
       within: ws?['within'] is bool ? ws!['within'] as bool : null,
       radiusM: _int(ws?['radius_m']),
+      matchDistance: _num(j['match_distance']),
     );
   }
 }

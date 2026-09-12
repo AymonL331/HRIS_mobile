@@ -5,7 +5,7 @@ credentials as the website, clock in / out from their own phone, read their own
 DTR and read their own payslips. **Location is mandatory**: the app does not run
 while the phone's location is off, the permission is missing, or the accuracy is
 set to Approximate, and every punch takes a fresh GPS fix that the server checks
-against the branch worksite.
+against the branch worksite. **Face recognition is mandatory too** — see below.
 
 Only accounts HR has switched on (**Employee profile › Account › Mobile app**)
 can sign in. Turning the switch off signs the phone out on its next request.
@@ -15,7 +15,8 @@ can sign in. Turning the switch off signs the phone out on its next request.
 The same Node/Express API as the web app — no direct database access. It uses the
 mobile-only endpoints added by migrations 057/058 (`/api/me/mobile-clock`,
 `/api/me/mobile-clock/status`) plus `/api/auth/*`, `/api/me/location-consent`,
-`/api/me/attendance/calendar` and `/api/me/payslips` (`/:id`, `/:id/breakdown`).
+`/api/me/attendance/calendar`, `/api/me/payslips` (`/:id`, `/:id/breakdown`) and
+`/api/me/face-clock/challenge` (the liveness challenge every punch must answer).
 The server holds every rule; the app never grades attendance and never computes a
 peso figure itself — My Payslips renders what payroll already paid, and the
 "How this was computed" working is built server-side by the same function that
@@ -34,6 +35,41 @@ token's `/api/me/` window.
 
 On the Android emulator, the host PC is `10.0.2.2`: set Sandbox to `http://10.0.2.2:5001`
 under Login › Advanced to hit a sandbox server running on the PC (debug builds only).
+
+## The face check
+
+Every punch is face-verified (2026-09-13). Tapping **Time In** or **Time Out** takes
+a GPS fix, then opens the face check: the server issues a single-use nonce and a
+randomized ordered liveness sequence (blink / turn head), the app runs exactly that
+sequence, and the captured embedding is submitted with the punch. The server is
+authoritative for all of it — anti-replay, challenge integrity, the liveness gate
+and the 1:1 match. There is **no manual fallback**: a fallback one tap away would
+make the biometric gate optional. An employee with no enrolled face is told so on
+the home screen and cannot punch until HR enrols them on the website.
+
+The embedding is produced by the **same `@vladmandic/human` build and the same model
+weights the web client uses** — `assets/face/human.js` and `assets/face/models/` are
+byte-for-byte copies of `client/node_modules/@vladmandic/human/dist/human.js` and
+`client/public/models/`. That is not an optimisation, it is the requirement: a
+different model means a different vector space, and every template already enrolled
+from the website would stop matching. Everything that touches the embedding — the
+Human config, the L2 normalisation, the eye-openness formula, the liveness
+thresholds — is ported verbatim from `client/src/services/faceEngine.js` and
+`client/src/utils/liveness.js` into `assets/face/capture.html`. **Change one and you
+must change both.**
+
+The capture runs in a WebView because that is the only way to run that exact
+library. It is served from a loopback HTTP server inside the app
+(`lib/features/face/face_asset_server.dart`) rather than `file://`, for two reasons:
+`getUserMedia` needs a secure context, and Human fetches its weights (blocked from a
+`file://` document unless the WebView is opened up, which is not a thing to do in an
+app handling biometrics). Loopback is allowlisted in
+`android/app/src/main/res/xml/network_security_config.xml`; without that entry the
+page silently never loads. Nothing is fetched from the network — the weights ship in
+the APK, which is also what RA 10173 wants (no third-party fetch of a biometric
+model).
+
+Camera permission is requested at the first capture, never at launch.
 
 ## Who sees what
 
@@ -61,8 +97,9 @@ Change the compiled defaults at build time:
 flutter build apk --release --dart-define=HRIS_MAIN_URL=https://hris.example.com --dart-define=HRIS_SANDBOX_URL=https://sandbox.example.com
 ```
 
-Cleartext HTTP is allowed only for `192.168.137.1` (and `10.0.2.2` in debug builds);
-a production host must be HTTPS.
+Cleartext HTTP is allowed only for `192.168.137.1`, for `127.0.0.1`/`localhost` (the
+face capture's in-app asset server, which never leaves the device) and for `10.0.2.2`
+in debug builds; a production host must be HTTPS.
 
 ## Run it
 
@@ -139,7 +176,10 @@ lib/
              location (gate + fixes), time (Manila time, server clock),
              format (money, the web's formatMoney/exactRate)
   features/  auth (login, change password), consent, time_clock, attendance,
-             payslips, settings, shell (the sidebar + the location gate)
+             payslips, face (the capture screen + its loopback asset server),
+             settings, shell (the sidebar + the location gate)
   shared/    theme, widgets
+assets/face/ the capture page, human.js and the model weights (~15 MB, copied
+             from the web client — see 'The face check')
 test/        unit + widget tests (flutter test)
 ```

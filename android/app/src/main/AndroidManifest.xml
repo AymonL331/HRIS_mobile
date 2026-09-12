@@ -4,6 +4,13 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- The face check that gates every punch (2026-09-13). Requested at the
+         moment of the first capture, never at launch. `required="false"` on the
+         feature so the app still installs on a device with no front camera —
+         it then says so instead of being unlistable. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
     <application
         android:label="HRIS"
         android:networkSecurityConfig="@xml/network_security_config"

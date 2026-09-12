@@ -11,6 +11,8 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/message_banner.dart';
 import '../../shared/widgets/status_badge.dart';
 import '../consent/consent_screen.dart';
+import '../face/face_capture_screen.dart';
+import '../face/face_models.dart';
 import 'clock_models.dart';
 import 'time_clock_controller.dart';
 
@@ -18,7 +20,13 @@ import 'time_clock_controller.dart';
 /// two big buttons, and the outcome of the last tap — laid out like the web
 /// My Time Clock page: a centred hero card, then the cards beneath it.
 class TimeClockScreen extends StatefulWidget {
-  const TimeClockScreen({super.key});
+  /// Replaces the real face-capture screen. Only the widget tests pass this —
+  /// they cannot run a WebView or a camera, and the punch flow around the face
+  /// check is what those tests are about.
+  @visibleForTesting
+  final FaceCapturer? captureOverride;
+
+  const TimeClockScreen({super.key, this.captureOverride});
 
   @override
   State<TimeClockScreen> createState() => _TimeClockScreenState();
@@ -57,6 +65,12 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
     if (!status.consentGiven) {
       return ConsentScreen(saving: c.consentSaving, onAgree: c.grantConsent);
     }
+    // The clock is face-gated, so an employee with no enrolled template cannot
+    // punch at all. Said HERE, on the home screen, rather than after they have
+    // stood in front of a camera for twenty seconds to be refused.
+    if (!status.face.canPunch) {
+      return const _NotEnrolled();
+    }
 
     final tenant = context.read<SessionController>().tenant;
     final now = c.clock.nowUtc();
@@ -81,7 +95,7 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
           const SizedBox(height: HrisSpace.s3),
           _WorksiteCard(controller: c),
           const SizedBox(height: HrisSpace.s4),
-          _PunchButtons(controller: c),
+          _PunchButtons(controller: c, captureOverride: widget.captureOverride),
           if (c.outcome != null) ...[
             const SizedBox(height: HrisSpace.s4),
             _OutcomeCard(outcome: c.outcome!, onDismiss: c.dismissOutcome, onConsent: c.grantConsent),
@@ -289,7 +303,8 @@ class _WorksiteCard extends StatelessWidget {
 /// clothes — the tests find both by type).
 class _PunchButtons extends StatelessWidget {
   final TimeClockController controller;
-  const _PunchButtons({required this.controller});
+  final FaceCapturer? captureOverride;
+  const _PunchButtons({required this.controller, this.captureOverride});
 
   @override
   Widget build(BuildContext context) {
@@ -298,21 +313,42 @@ class _PunchButtons extends StatelessWidget {
     final t = HrisTokens.of(context);
     final phaseText = switch (controller.phase) {
       ClockPhase.locating => 'Getting your location…',
+      ClockPhase.verifyingFace => 'Checking your face…',
       ClockPhase.submitting => 'Recording…',
       ClockPhase.idle => null,
     };
+
+    // Pushes the face check and hands its result back to the controller. Lives
+    // here because only the widget tree can present a screen; the controller
+    // stays testable without a camera.
+    Future<FaceResult> capture(String direction) async {
+      final override = captureOverride;
+      if (override != null) return override(direction);
+      final result = await Navigator.of(context).push<FaceResult>(
+        MaterialPageRoute<FaceResult>(
+          builder: (_) => FaceCaptureScreen(
+            direction: direction,
+            issueChallenge: controller.api.faceChallenge,
+          ),
+          fullscreenDialog: true,
+        ),
+      );
+      // A dismissed route (system back, no result) is a cancel, not a punch.
+      return result ?? const FaceFailed(FaceFailure.cancelled);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FilledButton.icon(
-          onPressed: !busy && s.canClockIn ? () => controller.punch('in') : null,
+          onPressed: !busy && s.canClockIn ? () => controller.punch('in', capture: capture) : null,
           icon: const Icon(Icons.login),
           label: const Text('Time In'),
           style: HrisButtonStyles.primaryLg(context),
         ),
         const SizedBox(height: HrisSpace.s3),
         FilledButton.tonalIcon(
-          onPressed: !busy && s.canClockOut ? () => controller.punch('out') : null,
+          onPressed: !busy && s.canClockOut ? () => controller.punch('out', capture: capture) : null,
           icon: const Icon(Icons.logout),
           label: const Text('Time Out'),
           style: HrisButtonStyles.secondaryLg(context),
@@ -426,4 +462,47 @@ class _LoadError extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// Shown instead of the clock when the signed-in employee has no active face
+/// template. The mobile clock is face-gated (2026-09-13), so there is nothing
+/// they can do from the app — the fix is HR enrolling their face on the website,
+/// and saying that plainly beats a camera that refuses them.
+class _NotEnrolled extends StatelessWidget {
+  const _NotEnrolled();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = HrisTokens.of(context);
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(HrisSpace.s4),
+        child: AppCard(
+          maxWidth: 440,
+          centered: true,
+          padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s5, vertical: HrisSpace.s6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.face_retouching_off_outlined, size: 40, color: t.muted),
+              const SizedBox(height: HrisSpace.s3),
+              Text(
+                'Face not enrolled yet',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
+              ),
+              const SizedBox(height: HrisSpace.s2),
+              Text(
+                'Clocking in and out from the app is verified by face recognition, and your face has not been '
+                'enrolled yet. Ask HR to enrol you — it takes a minute at the office — and this screen becomes '
+                'your time clock.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

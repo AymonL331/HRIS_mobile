@@ -8,6 +8,7 @@ import 'package:hris_mobile/core/auth/session_store.dart';
 import 'package:hris_mobile/core/config/env_store.dart';
 import 'package:hris_mobile/core/location/location_fix.dart';
 import 'package:hris_mobile/core/location/location_gate_service.dart';
+import 'package:hris_mobile/features/face/face_models.dart';
 import 'package:hris_mobile/features/time_clock/clock_api.dart';
 import 'package:hris_mobile/features/time_clock/clock_models.dart';
 import 'package:hris_mobile/features/auth/change_password_screen.dart';
@@ -113,9 +114,17 @@ class _StubClock implements ClockApi {
         'server_time': '2026-09-11T00:00:00.000Z', 'timezone': 'Asia/Manila', 'local_date': '2026-09-11', 'clock_date': '2026-09-11',
         'employee': {'first_name': 'Olive', 'last_name': 'Office', 'employee_code': 'E1'}, 'today': null,
         'worksite': {'configured': false}, 'consent': {'consent_given': true},
+        'face': {'required': true, 'enrolled': true, 'model_version': 'human-3', 'liveness_challenges': ['blink']},
       });
   @override
-  Future<PunchResponse> punch({required String direction, required LocationFix fix}) => throw UnimplementedError();
+  Future<FaceChallenge> faceChallenge(String direction) => throw UnimplementedError();
+  @override
+  Future<PunchResponse> punch({
+    required String direction,
+    required LocationFix fix,
+    required FaceCapture capture,
+  }) =>
+      throw UnimplementedError();
   @override
   Future<void> grantConsent() async {}
 }

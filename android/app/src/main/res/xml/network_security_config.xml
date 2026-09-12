@@ -10,4 +10,16 @@
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">192.168.137.1</domain>
     </domain-config>
+    <!--
+      LOOPBACK, for the face capture only. The app serves the bundled capture
+      page and its model weights from an ephemeral port on 127.0.0.1 so the
+      WebView gets a secure context for getUserMedia and can fetch() the weights
+      (see lib/features/face/face_asset_server.dart). This traffic never leaves
+      the device — there is no network exposure to permit here, and without the
+      entry the page simply never loads.
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
 </network-security-config>

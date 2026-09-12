@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../fakes/clock_fakes.dart';
 
-Future<TimeClockController> mount(WidgetTester tester, FakeClockApi api, FakeFixService fixes) async {
+Future<TimeClockController> mount(WidgetTester tester, FakeClockApi api, FakeFixService fixes, {FakeFaceCapturer? face}) async {
   SharedPreferences.setMockInitialValues({});
   final env = EnvStore();
   await env.load();
@@ -23,7 +23,9 @@ Future<TimeClockController> mount(WidgetTester tester, FakeClockApi api, FakeFix
       ChangeNotifierProvider<SessionController>.value(value: session),
       ChangeNotifierProvider<TimeClockController>.value(value: controller),
     ],
-    child: const MaterialApp(home: Scaffold(body: TimeClockScreen())),
+    // The face check is stubbed: a widget test cannot run a WebView or a
+    // camera, and what these tests are about is the punch flow AROUND it.
+    child: MaterialApp(home: Scaffold(body: TimeClockScreen(captureOverride: (face ?? FakeFaceCapturer()).call))),
   ));
   // The screen ticks every second, so never pumpAndSettle here.
   await tester.pump();

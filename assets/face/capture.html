@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>HRIS face capture</title>
+<!--
+  THE FACE CAPTURE SURFACE FOR THE MOBILE APP.
+
+  This page exists for one reason: the embedding it produces must land in the
+  SAME vector space as the templates enrolled from the website, or nothing
+  matches. The website runs @vladmandic/human (TensorFlow.js) in the browser and
+  stores the result as model_version 'human-3'; the only way to be certain a
+  phone produces a comparable vector is to run the IDENTICAL library against the
+  IDENTICAL weights. So `human.js` and `models/` here are byte-for-byte copies of
+  what the web client ships, and every number below — the Human config, the L2
+  normalisation, the eye-openness formula, the liveness thresholds — is ported
+  verbatim from client/src/services/faceEngine.js and client/src/utils/liveness.js.
+
+  If you change anything in this file, change it in BOTH places or enrolled
+  employees silently stop matching on one of the two surfaces.
+
+  It is loaded from a loopback HTTP server inside the app (not file://) so that
+  getUserMedia has a secure context and fetch() can read the model weights.
+  Everything is local: no network call leaves the device from this page.
+
+  The SERVER remains authoritative for the real gates — anti-replay, challenge
+  integrity, the liveness verdict and the 1:1 match (Biometric Standards rule 5).
+  What happens here is the capture UX and the on-device signals.
+-->
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0f172a; overflow: hidden; }
+  body { font: 15px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; color: #e2e8f0; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  /* The oval the face goes in: a ring whose colour IS the quality signal. */
+  #ring {
+    position: fixed; left: 50%; top: 46%; transform: translate(-50%, -50%);
+    width: 74vw; max-width: 320px; aspect-ratio: 3 / 4;
+    border: 3px solid rgba(148, 163, 184, 0.7); border-radius: 50%;
+    transition: border-color 160ms ease; pointer-events: none;
+  }
+  #ring.good { border-color: #22c55e; }
+  #ring.low { border-color: #fcd34d; }
+  #ring.bad { border-color: #dc2626; }
+  #prompt {
+    position: fixed; left: 16px; right: 16px; top: 24px; text-align: center;
+    font-size: 20px; font-weight: 600; line-height: 1.3; text-shadow: 0 1px 6px rgba(0,0,0,.7);
+  }
+  #hint {
+    position: fixed; left: 16px; right: 16px; bottom: 28px; text-align: center;
+    font-size: 14px; color: #cbd5e1; text-shadow: 0 1px 6px rgba(0,0,0,.7);
+  }
+  #veil {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: #0f172a; text-align: center; padding: 24px; font-size: 15px; color: #94a3b8;
+  }
+  #veil.hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="stage"><video id="video" playsinline autoplay muted></video></div>
+<div id="ring"></div>
+<div id="prompt"></div>
+<div id="hint"></div>
+<div id="veil">Preparing the camera…</div>
+
+<script src="human.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  // --- the bridge to Flutter -------------------------------------------------
+  function send(msg) {
+    try { window.HrisFace.postMessage(JSON.stringify(msg)); } catch (_) { /* not embedded */ }
+  }
+  const veil = document.getElementById('veil');
+  const ring = document.getElementById('ring');
+  const promptEl = document.getElementById('prompt');
+  const hintEl = document.getElementById('hint');
+  const video = document.getElementById('video');
+
+  // === PORTED VERBATIM from client/src/services/faceEngine.js ================
+  // Only the face models are enabled (the six weight sets under models/). Body,
+  // hand and object detectors stay off so their weights are never requested.
+  const MODEL_VERSION = 'human-3';
+  const EMBEDDING_MIN_DIMS = 64;
+  const EMBEDDING_MAX_DIMS = 2048;
+  const MIN_DETECTION_SCORE = 0.6;
+
+  function buildConfig() {
+    return {
+      modelBasePath: 'models',
+      // 'humangl' (WebGL) where the WebView offers it; Human falls back on its
+      // own if the context cannot be created. The BACKEND does not change the
+      // embedding, only how fast it is computed.
+      backend: 'humangl',
+      cacheModels: true,
+      warmup: 'face',
+      debug: false,
+      face: {
+        enabled: true,
+        detector: { rotation: true, maxDetected: 1 },
+        mesh: { enabled: true },
+        iris: { enabled: true },
+        description: { enabled: true }, // faceres → the embedding
+        emotion: { enabled: false },
+        liveness: { enabled: true },
+        antispoof: { enabled: true },
+      },
+      body: { enabled: false },
+      hand: { enabled: false },
+      object: { enabled: false },
+      gesture: { enabled: true },
+      segmentation: { enabled: false },
+    };
+  }
+
+  function isUsableEmbedding(e) {
+    return Array.isArray(e) && e.length >= EMBEDDING_MIN_DIMS && e.length <= EMBEDDING_MAX_DIMS
+      && e.every((n) => typeof n === 'number' && Number.isFinite(n));
+  }
+
+  // Continuous eye-openness ratio (average of both eyes), replicating Human's own
+  // blink math (gesture.ts flags a blink when this ratio < 0.2).
+  function eyeOpennessFromMesh(mesh) {
+    if (!Array.isArray(mesh) || mesh.length <= 450) return null;
+    const left = Math.abs(mesh[374][1] - mesh[386][1]) / Math.abs(mesh[443][1] - mesh[450][1]);
+    const right = Math.abs(mesh[145][1] - mesh[159][1]) / Math.abs(mesh[223][1] - mesh[230][1]);
+    if (!Number.isFinite(left) || !Number.isFinite(right)) return null;
+    return (left + right) / 2;
+  }
+
+  // L2-normalize to unit length. Human's faceres descriptors are NOT unit
+  // vectors, so their raw Euclidean distance runs ~8-12 even for the same face —
+  // far outside the backend's [0,2] threshold range. The web normalizes on BOTH
+  // enrollment and clock, so this must too, or a genuine face never matches.
+  function l2Normalize(vec) {
+    let sumSq = 0;
+    for (let i = 0; i < vec.length; i += 1) sumSq += vec[i] * vec[i];
+    const norm = Math.sqrt(sumSq);
+    if (!Number.isFinite(norm) || norm === 0) return vec;
+    return vec.map((v) => v / norm);
+  }
+
+  let human = null;
+  let detectChain = Promise.resolve();
+
+  async function runDetect(input) {
+    const result = await human.detect(input);
+    const faces = (result && result.face) || [];
+    if (faces.length === 0) return { faceCount: 0, face: null };
+    const f = faces[0];
+    const embedding = Array.isArray(f.embedding) ? l2Normalize(f.embedding) : null;
+    return {
+      faceCount: faces.length,
+      face: {
+        embedding,
+        embeddingDims: embedding ? embedding.length : 0,
+        detectionScore: f.faceScore != null ? f.faceScore : (f.score || 0),
+        yaw: (f.rotation && f.rotation.angle && typeof f.rotation.angle.yaw === 'number') ? f.rotation.angle.yaw : null,
+        eyeOpenness: eyeOpennessFromMesh(f.mesh),
+      },
+    };
+  }
+
+  // A single Human instance is NOT safe under overlapping detect() calls (it
+  // reuses internal tensors), so every detect is chained to run one at a time.
+  function detectFace(input) {
+    const next = detectChain.then(() => runDetect(input), () => runDetect(input));
+    detectChain = next.then(() => undefined, () => undefined);
+    return next;
+  }
+
+  // === PORTED VERBATIM from client/src/utils/liveness.js =====================
+  const BLINK_COUNT = 2;
+  const EYE_CLOSED = 0.2;
+  const EYE_OPEN = 0.28;
+  const CENTER_YAW = 0.16; // ~9°
+  const TURN_YAW = 0.45;   // ~26°
+
+  function makeChallenge(type) {
+    if (type === 'blink') return { type, required: BLINK_COUNT, count: 0, eyeState: 'unknown' };
+    if (type === 'turn_head') return { type, phase: 'await_center' };
+    return null;
+  }
+  function stepBlink(state, s) {
+    if (s.eyeOpenness == null) return state;
+    let eyeState = state.eyeState;
+    let count = state.count;
+    if (s.eyeOpenness > EYE_OPEN) {
+      if (eyeState === 'closed') count += 1; // one open→closed→open cycle
+      eyeState = 'open';
+    } else if (s.eyeOpenness < EYE_CLOSED) {
+      if (eyeState === 'open') eyeState = 'closed';
+    }
+    if (eyeState === state.eyeState && count === state.count) return state;
+    return Object.assign({}, state, { eyeState, count });
+  }
+  function stepTurn(state, s) {
+    if (s.yaw == null) return state;
+    const mag = Math.abs(s.yaw);
+    if (state.phase === 'await_center') return mag < CENTER_YAW ? Object.assign({}, state, { phase: 'await_turn' }) : state;
+    if (state.phase === 'await_turn') return mag > TURN_YAW ? Object.assign({}, state, { phase: 'done' }) : state;
+    return state;
+  }
+  function stepChallenge(ch, signals) {
+    if (!ch) return ch;
+    if (!signals.faceDetected || signals.faceCount !== 1) return ch;
+    if (ch.type === 'blink') return stepBlink(ch, signals);
+    if (ch.type === 'turn_head') return stepTurn(ch, signals);
+    return ch;
+  }
+  function challengeDone(ch) {
+    if (!ch) return false;
+    if (ch.type === 'blink') return ch.count >= ch.required;
+    if (ch.type === 'turn_head') return ch.phase === 'done';
+    return false;
+  }
+  function challengePrompt(ch) {
+    if (!ch) return '';
+    if (ch.type === 'blink') {
+      const left = Math.max(0, ch.required - ch.count);
+      return left > 0 ? ('Blink ' + left + ' more time' + (left === 1 ? '' : 's')) : 'Blink detected';
+    }
+    if (ch.type === 'turn_head') {
+      return ch.phase === 'await_center' ? 'Face the camera straight on' : 'Now slowly turn your head to one side';
+    }
+    return '';
+  }
+
+  // === the driver ===========================================================
+  // Mirrors client/src/hooks/useFaceLiveness.js: a faster detect interval than the
+  // plain preview so a quick blink is not missed between frames, and a per-action
+  // window after which the attempt fails rather than hanging.
+  const DETECT_INTERVAL_MS = 120;
+  const PER_CHALLENGE_TIMEOUT_MS = 15000;
+
+  let sequence = [];
+  let index = 0;
+  let phase = 'idle'; // idle | running | done
+  let actionStartedAt = 0;
+  let stream = null;
+  let busy = false;
+
+  function fail(reason) {
+    if (phase === 'done') return;
+    phase = 'done';
+    send({ type: 'result', ok: false, reason });
+  }
+
+  function setRing(quality) {
+    ring.className = quality === 'good' ? 'good' : quality === 'low' ? 'low' : quality === 'multiple' ? 'bad' : '';
+  }
+
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+    } catch (err) {
+      const name = err && err.name;
+      fail(name === 'NotAllowedError' || name === 'SecurityError' ? 'camera_denied'
+        : name === 'NotFoundError' ? 'no_camera' : 'camera_error');
+      return false;
+    }
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+    return true;
+  }
+
+  function stopCamera() {
+    if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
+  }
+
+  async function tick() {
+    if (phase !== 'running') return;
+    if (video.readyState >= 2 && !busy) {
+      busy = true;
+      try {
+        const { faceCount, face } = await detectFace(video);
+        if (phase !== 'running') return;
+        const signals = {
+          faceDetected: faceCount > 0,
+          faceCount,
+          eyeOpenness: face ? face.eyeOpenness : null,
+          yaw: face ? face.yaw : null,
+        };
+        const usable = face && face.detectionScore >= MIN_DETECTION_SCORE && isUsableEmbedding(face.embedding);
+        const quality = faceCount === 0 ? 'no_face' : faceCount > 1 ? 'multiple' : (usable ? 'good' : 'low');
+        setRing(quality);
+        hintEl.textContent = faceCount === 0 ? 'Center your face in the oval'
+          : faceCount > 1 ? 'Only one person in frame'
+          : usable ? '' : 'Move into better light and face the camera';
+
+        const current = sequence[index];
+        const advanced = stepChallenge(current, signals);
+        sequence[index] = advanced;
+        promptEl.textContent = challengePrompt(advanced);
+
+        if (challengeDone(advanced)) {
+          index += 1;
+          actionStartedAt = Date.now();
+          if (index >= sequence.length) { await finish(); return; }
+        } else if (Date.now() - actionStartedAt > PER_CHALLENGE_TIMEOUT_MS) {
+          stopCamera();
+          fail('timeout');
+          return;
+        }
+      } catch (_) {
+        // A transient per-frame error must not kill the attempt.
+      } finally {
+        busy = false;
+      }
+    }
+    setTimeout(tick, DETECT_INTERVAL_MS);
+  }
+
+  // Every challenge passed — take the embedding that will actually be submitted.
+  async function finish() {
+    promptEl.textContent = 'Hold still…';
+    hintEl.textContent = '';
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      try {
+        const { faceCount, face } = await detectFace(video);
+        if (faceCount === 1 && face && isUsableEmbedding(face.embedding)) {
+          phase = 'done';
+          stopCamera();
+          send({
+            type: 'result',
+            ok: true,
+            embedding: face.embedding,
+            dims: face.embeddingDims,
+            modelVersion: MODEL_VERSION,
+            completed: sequence.map((c) => c.type),
+          });
+          return;
+        }
+      } catch (_) { /* retry */ }
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    stopCamera();
+    fail('no_embedding');
+  }
+
+  // Flutter calls this with the SERVER-issued ordered actions. The order is the
+  // server's, never shuffled here: the backend verifies the response against the
+  // challenge it issued, so running them in any other order fails the attempt.
+  // Every stage is announced (to Flutter, and to the console so `adb logcat`
+  // can see it) because "Loading the face model…" with no further word is
+  // indistinguishable from a hang — which is exactly how this first behaved on
+  // an emulator with software WebGL.
+  function stage(text) {
+    veil.textContent = text;
+    console.log('[hris-face] ' + text);
+    send({ type: 'status', state: 'stage', stage: text });
+  }
+
+  // Nothing here may hang forever. TF.js model loading and the warm-up pass can
+  // both stall on a device with no usable GPU, and a clock screen that never
+  // resolves is worse than one that says it failed.
+  function withTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout: ' + label)), ms)),
+    ]);
+  }
+
+  const LOAD_TIMEOUT_MS = 45000;
+  const WARMUP_TIMEOUT_MS = 20000;
+
+  window.hrisStart = async function hrisStart(actions) {
+    try {
+      const types = (Array.isArray(actions) ? actions : []).filter((t) => t === 'blink' || t === 'turn_head');
+      if (types.length === 0) { fail('no_challenge'); return; }
+
+      if (!human) {
+        stage('Loading the face model…');
+        human = new Human.Human(buildConfig());
+        try {
+          await withTimeout(human.load(), LOAD_TIMEOUT_MS, 'load');
+        } catch (err) {
+          // The usual cause is no usable WebGL (an emulator, an old device).
+          // Falling back to the CPU backend is slower but still produces the
+          // SAME embedding — the backend decides how the math runs, not what it
+          // computes — so a fallback never costs compatibility.
+          console.log('[hris-face] humangl failed (' + err.message + '), retrying on cpu');
+          stage('Loading the face model (compatibility mode)…');
+          const cfg = buildConfig();
+          cfg.backend = 'cpu';
+          cfg.warmup = 'none';
+          human = new Human.Human(cfg);
+          await withTimeout(human.load(), LOAD_TIMEOUT_MS, 'load-cpu');
+        }
+        console.log('[hris-face] models loaded on backend: ' + human.tf.getBackend());
+        stage('Warming up…');
+        try {
+          await withTimeout(human.warmup(), WARMUP_TIMEOUT_MS, 'warmup');
+        } catch (err) {
+          // A warm-up is a performance nicety; the first real detect compiles
+          // instead. Never fatal.
+          console.log('[hris-face] warmup skipped: ' + err.message);
+        }
+      }
+      stage('Starting the camera…');
+      if (!(await startCamera())) return;
+
+      sequence = types.map(makeChallenge).filter(Boolean);
+      index = 0;
+      phase = 'running';
+      actionStartedAt = Date.now();
+      veil.classList.add('hidden');
+      send({ type: 'status', state: 'ready' });
+      tick();
+    } catch (err) {
+      console.log('[hris-face] fatal: ' + (err && err.message));
+      stopCamera();
+      fail('engine_error');
+    }
+  };
+
+  window.hrisStop = function hrisStop() { phase = 'done'; stopCamera(); };
+
+  send({ type: 'status', state: 'loaded' });
+})();
+</script>
+</body>
+</html>

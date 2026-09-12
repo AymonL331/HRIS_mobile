@@ -7,6 +7,12 @@ abstract final class Endpoints {
 
   static const mobileClockStatus = '/api/me/mobile-clock/status';
   static const mobileClock = '/api/me/mobile-clock';
+
+  /// The liveness challenge a punch must answer. Shared with the WEB field
+  /// clock — a challenge is surface-agnostic (it issues a nonce and an ordered
+  /// action sequence; what differs is which endpoint consumes it), so the app
+  /// reuses the existing route rather than asking for a second one.
+  static const faceChallenge = '/api/me/face-clock/challenge';
   static const locationConsent = '/api/me/location-consent';
   static const attendanceCalendar = '/api/me/attendance/calendar';
 

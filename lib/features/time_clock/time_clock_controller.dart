@@ -3,10 +3,18 @@ import 'package:flutter/foundation.dart';
 import '../../core/http/api_exception.dart';
 import '../../core/location/location_fix.dart';
 import '../../core/time/server_clock.dart';
+import '../face/face_capture_screen.dart';
+import '../face/face_models.dart';
 import 'clock_api.dart';
 import 'clock_models.dart';
 
-enum ClockPhase { idle, locating, submitting }
+enum ClockPhase { idle, locating, verifyingFace, submitting }
+
+/// Presents the face check and returns what it produced. The controller does not
+/// know how the capture is drawn — the screen pushes [FaceCaptureScreen] and the
+/// tests hand back a canned result, so the punch flow is testable without a
+/// camera or a WebView.
+typedef FaceCapturer = Future<FaceResult> Function(String direction);
 
 /// What the last punch attempt came to. Shown as a card until the next tap.
 sealed class PunchOutcome {
@@ -130,7 +138,18 @@ class TimeClockController extends ChangeNotifier {
     }
   }
 
-  Future<void> punch(String direction) async {
+  /// One punch, end to end: a fresh fix, then the face check, then the write.
+  ///
+  /// The order is deliberate. The GPS fix is cheap and fails often (indoors, no
+  /// permission, mocked), so it is taken FIRST — there is no point asking
+  /// somebody to blink at a camera for twenty seconds and only then telling them
+  /// their location was refused.
+  ///
+  /// The face check is REQUIRED (user decision 2026-09-13). There is no path
+  /// through this method that submits without one, and the server refuses a
+  /// punch without the face payload anyway — the gate is enforced in both
+  /// places, not just here.
+  Future<void> punch(String direction, {required FaceCapturer capture}) async {
     if (busy) return;
     _outcome = null;
     _phase = ClockPhase.locating;
@@ -157,10 +176,28 @@ class TimeClockController extends ChangeNotifier {
         warnLowAccuracy = w;
     }
 
+    // The face check. A refusal here ends the attempt — nothing is written, and
+    // the reason is the employee's to act on (enrol, better light, allow the
+    // camera). Cancelling is silent: they chose not to punch.
+    _phase = ClockPhase.verifyingFace;
+    _notify();
+    final faceResult = await capture(direction);
+    final FaceCapture faceCapture;
+    switch (faceResult) {
+      case FaceCaptured(capture: final c):
+        faceCapture = c;
+      case FaceFailed(reason: FaceFailure.cancelled):
+        _fail(null);
+        return;
+      case FaceFailed(:final reason, :final serverMessage):
+        _fail(PunchFailure(serverMessage ?? faceFailureMessage(reason)));
+        return;
+    }
+
     _phase = ClockPhase.submitting;
     _notify();
     try {
-      final r = await api.punch(direction: direction, fix: fix);
+      final r = await api.punch(direction: direction, fix: fix, capture: faceCapture);
       _outcome = PunchSuccess(r, warnLowAccuracy: warnLowAccuracy);
       if (r.serverTime != null) clock.sync(r.serverTime!);
       await load(silent: true);
@@ -179,7 +216,9 @@ class TimeClockController extends ChangeNotifier {
     }
   }
 
-  void _fail(PunchOutcome o) {
+  /// End the attempt. A null outcome leaves no card behind — used when the
+  /// employee cancelled the face check, which is a decision, not a failure.
+  void _fail(PunchOutcome? o) {
     _outcome = o;
     _phase = ClockPhase.idle;
     _notify();
