@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/session_controller.dart';
 import '../../core/location/location_fix.dart';
+import '../../shared/tokens.dart';
+import '../../shared/widgets/brand_mark.dart';
+import '../../shared/widgets/page_header.dart';
+import '../../shared/widgets/user_avatar.dart';
 import '../attendance/attendance_api.dart';
 import '../attendance/attendance_controller.dart';
 import '../attendance/attendance_screen.dart';
@@ -75,17 +79,37 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ),
       ],
+      // The web shell: the brand top bar with the account avatar, a page header
+      // on the page background, the content, and the tabs (in the sidebar's
+      // colours) along the bottom.
       child: Scaffold(
-        appBar: AppBar(title: Text(titles[_index])),
-        body: IndexedStack(index: _index, children: pages),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.punch_clock_outlined), selectedIcon: Icon(Icons.punch_clock), label: 'Time Clock'),
-            NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Attendance'),
-            NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+        appBar: AppBar(
+          title: const BrandMark(),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: HrisSpace.s5),
+              child: UserAvatar(user?.username ?? ''),
+            ),
           ],
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PageHeader(titles[_index]),
+            Expanded(child: IndexedStack(index: _index, children: pages)),
+          ],
+        ),
+        bottomNavigationBar: DecoratedBox(
+          decoration: BoxDecoration(border: Border(top: BorderSide(color: HrisTokens.of(context).border))),
+          child: NavigationBar(
+            selectedIndex: _index,
+            onDestinationSelected: (i) => setState(() => _index = i),
+            destinations: const [
+              NavigationDestination(icon: Icon(Icons.punch_clock_outlined), selectedIcon: Icon(Icons.punch_clock), label: 'Time Clock'),
+              NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Attendance'),
+              NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+            ],
+          ),
         ),
       ),
     );

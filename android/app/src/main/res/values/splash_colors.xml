@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The web page colour and brand dot (client/src/styles/tokens.css :root).
+     Kept apart from colors.xml, which flutter_launcher_icons rewrites. -->
+<resources>
+    <color name="splash_bg">#f1f5f9</color>
+    <color name="splash_dot">#2563eb</color>
+</resources>

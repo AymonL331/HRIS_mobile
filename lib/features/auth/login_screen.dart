@@ -5,6 +5,9 @@ import '../../core/auth/session_controller.dart';
 import '../../core/config/app_env.dart';
 import '../../core/config/env_store.dart';
 import '../../core/http/api_exception.dart';
+import '../../shared/tokens.dart';
+import '../../shared/widgets/app_card.dart';
+import '../../shared/widgets/brand_mark.dart';
 import '../../shared/widgets/message_banner.dart';
 import 'env_settings_sheet.dart';
 
@@ -81,30 +84,37 @@ class _LoginScreenState extends State<LoginScreen> {
     final selected = envStore.config.selected;
     final reason = session.state is SignedOut ? (session.state as SignedOut).reason : null;
     const envs = AppEnv.values;
+    final t = HrisTokens.of(context);
 
+    // The web login: one auth card on the page background — brand, a muted
+    // line, the fields recessed into the card, a full-width primary button.
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+            padding: const EdgeInsets.all(HrisSpace.s5),
+            child: AppCard(
+              maxWidth: 380,
+              padding: const EdgeInsets.all(HrisSpace.s6),
               child: AutofillGroup(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.badge_outlined, size: 56, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 8),
-                    Text('HRIS', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineMedium),
-                    Text('Employee time clock', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
-                    const SizedBox(height: 24),
+                    const BrandMark(size: BrandMarkSize.auth),
+                    const SizedBox(height: HrisSpace.s2),
+                    Text(
+                      'Employee time clock',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: HrisType.sm, color: t.muted, height: 1.4),
+                    ),
+                    const SizedBox(height: HrisSpace.s4),
                     SegmentedButton<AppEnv>(
                       segments: [for (final e in envs) ButtonSegment(value: e, label: Text(e.label))],
                       selected: {selected},
                       showSelectedIcon: false,
                       onSelectionChanged: _busy ? null : (s) => session.switchEnv(s.first),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: HrisSpace.s4),
                     if (reason != null && !_dismissedReason) ...[
                       MessageBanner.info(reason, onClose: () => setState(() => _dismissedReason = true)),
                       const SizedBox(height: 12),
@@ -164,11 +174,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: _busy ? null : () => EnvSettingsSheet.show(context),
                       child: const Text('Advanced…'),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: HrisSpace.s2),
                     Text(
                       envStore.config.baseUrl,
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+                      style: TextStyle(fontSize: HrisType.xs, color: t.muted, height: 1.4),
                     ),
                   ],
                 ),

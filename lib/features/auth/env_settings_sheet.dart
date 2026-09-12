@@ -111,7 +111,7 @@ class _EnvSettingsSheetState extends State<EnvSettingsSheet> {
               const Spacer(),
               FilledButton(
                 onPressed: _saving ? null : _save,
-                style: FilledButton.styleFrom(minimumSize: const Size(120, 44)),
+                style: FilledButton.styleFrom(minimumSize: const Size(120, 48)),
                 child: const Text('Save'),
               ),
             ],

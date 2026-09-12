@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
+<!-- The splash: the web page colour with the brand dot centred, shown until
+     Flutter draws its first frame (the Dart SplashScreen then takes over). -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
-
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+    <item android:drawable="@color/splash_bg" />
+    <item android:gravity="center" android:width="48dp" android:height="48dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/splash_dot" />
+        </shape>
+    </item>
 </layer-list>

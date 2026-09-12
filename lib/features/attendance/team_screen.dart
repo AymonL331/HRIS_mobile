@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/time/manila_time.dart';
+import '../../shared/tokens.dart';
+import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/message_banner.dart';
+import '../../shared/widgets/status_badge.dart';
 import 'team_controller.dart';
 import 'team_models.dart';
 
 /// Everyone's attendance for one day, read-only — the console DTR's calendar
 /// view on a phone, for a login that holds attendance:view. Who is in, who is
-/// late, who has no record, and whether a phone punch was in range.
+/// late, who has no record, and whether a phone punch was in range. Drawn
+/// like the web Records page: a toolbar bar, then the rows in a bordered card.
 class TeamAttendanceScreen extends StatefulWidget {
   const TeamAttendanceScreen({super.key});
 
@@ -52,8 +56,7 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.watch<TeamAttendanceController>();
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
+    final t = HrisTokens.of(context);
 
     final summary = c.loadedOnce && c.items.isNotEmpty
         ? [
@@ -68,9 +71,11 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
 
     return Column(
       children: [
-        // Day picker: back / label / forward (never past today) + Today.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        // The toolbar: day picker (back / label / forward, never past today,
+        // plus Today), on a surface bar with a hairline underneath.
+        Container(
+          decoration: BoxDecoration(color: t.surface, border: Border(bottom: BorderSide(color: t.border))),
+          padding: const EdgeInsets.fromLTRB(HrisSpace.s2, HrisSpace.s1, HrisSpace.s2, HrisSpace.s1),
           child: Row(
             children: [
               IconButton(
@@ -84,7 +89,7 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
                   child: Text(
                     ManilaTime.longDate(c.date),
                     textAlign: TextAlign.center,
-                    style: text.titleSmall,
+                    style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -96,12 +101,16 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
                 onPressed: c.loading || c.isToday ? null : c.nextDay,
               ),
               if (!c.isToday)
-                TextButton(onPressed: c.loading ? null : c.goToToday, child: const Text('Today')),
+                TextButton(
+                  onPressed: c.loading ? null : c.goToToday,
+                  style: TextButton.styleFrom(foregroundColor: t.primary),
+                  child: const Text('Today'),
+                ),
             ],
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s3, HrisSpace.s4, HrisSpace.s2),
           child: TextField(
             controller: _search,
             onChanged: c.setSearch,
@@ -125,38 +134,49 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
         ),
         if (summary != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.fromLTRB(HrisSpace.s4, 0, HrisSpace.s4, HrisSpace.s2),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 '${c.total} employee${c.total == 1 ? '' : 's'} · $summary',
-                style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
               ),
             ),
           ),
-        Expanded(child: _body(c)),
+        Expanded(child: _body(c, t)),
       ],
     );
   }
 
-  Widget _body(TeamAttendanceController c) {
+  Widget _body(TeamAttendanceController c, HrisTokens t) {
     if (!c.loadedOnce && c.loading) return const Center(child: CircularProgressIndicator());
     if (!c.loadedOnce && c.error != null) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              MessageBanner.error(c.error!),
-              const SizedBox(height: 12),
-              OutlinedButton(onPressed: c.load, child: const Text('Try again')),
-            ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(HrisSpace.s4),
+          child: AppCard(
+            tone: AppCardTone.danger,
+            maxWidth: 440,
+            centered: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                MessageBanner.error(c.error!),
+                const SizedBox(height: HrisSpace.s3),
+                OutlinedButton(onPressed: c.load, child: const Text('Try again')),
+              ],
+            ),
           ),
         ),
       );
     }
+
+    final cardDecoration = BoxDecoration(
+      color: t.surface,
+      border: Border.all(color: t.border),
+      borderRadius: BorderRadius.circular(HrisRadius.md),
+    );
 
     return RefreshIndicator(
       onRefresh: c.refresh,
@@ -164,40 +184,52 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
         slivers: [
           if (c.error != null)
             SliverToBoxAdapter(
-              child: Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8), child: MessageBanner.warning(c.error!)),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(HrisSpace.s4, 0, HrisSpace.s4, HrisSpace.s2),
+                child: MessageBanner.warning(c.error!),
+              ),
             ),
-          if (c.loading)
-            const SliverToBoxAdapter(child: LinearProgressIndicator(minHeight: 2)),
+          if (c.loading) const SliverToBoxAdapter(child: LinearProgressIndicator(minHeight: 2)),
           if (c.items.isEmpty && !c.loading)
             SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    c.search.trim().isEmpty ? 'No employees to show for this day.' : 'No employee matches "${c.search.trim()}".',
-                    textAlign: TextAlign.center,
+                  padding: const EdgeInsets.all(HrisSpace.s4),
+                  child: AppCard(
+                    maxWidth: 440,
+                    padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s5, vertical: HrisSpace.s6),
+                    child: Text(
+                      c.search.trim().isEmpty ? 'No employees to show for this day.' : 'No employee matches "${c.search.trim()}".',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.muted),
+                    ),
                   ),
                 ),
               ),
             )
           else
-            SliverList.separated(
-              itemCount: c.items.length,
-              itemBuilder: (_, i) => _PersonTile(day: c.items[i]),
-              separatorBuilder: (_, _) => const Divider(height: 1, indent: 16),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s1, HrisSpace.s4, HrisSpace.s3),
+              sliver: DecoratedSliver(
+                decoration: cardDecoration,
+                sliver: SliverList.separated(
+                  itemCount: c.items.length,
+                  itemBuilder: (_, i) => _PersonTile(day: c.items[i]),
+                  separatorBuilder: (_, _) => Divider(height: 1, indent: HrisSpace.s4, color: t.border),
+                ),
+              ),
             ),
           if (c.hasMore)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s1, HrisSpace.s4, HrisSpace.s5),
                 child: OutlinedButton.icon(
                   onPressed: c.loadingMore ? null : c.loadMore,
                   icon: c.loadingMore
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.expand_more),
                   label: Text('Load more (${c.items.length} of ${c.total})'),
-                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                 ),
               ),
             ),
@@ -213,35 +245,32 @@ class _PersonTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
+    final t = HrisTokens.of(context);
 
-    final (badgeText, badgeColor) = switch (day.dayType) {
-      'worked' => (
-          day.status == 'late' ? 'Late' : day.status == 'official_business' ? 'OB' : 'Present',
-          day.status == 'late' ? scheme.error : scheme.primary,
-        ),
-      'absent' => ('Absent', scheme.error),
-      'on_leave' => ('Leave', scheme.tertiary),
-      'holiday' => ('Holiday', scheme.secondary),
-      'rest_day' => ('Rest day', scheme.outline),
-      _ => ('No record', scheme.outline),
+    final badgeText = switch (day.dayType) {
+      'worked' => day.status == 'late' ? 'Late' : day.status == 'official_business' ? 'OB' : 'Present',
+      'absent' => 'Absent',
+      'on_leave' => 'Leave',
+      'holiday' => 'Holiday',
+      'rest_day' => 'Rest day',
+      _ => 'No record',
     };
+    final badgeTone = dtrDayTone(day.dayType, day.status);
 
     final times = !day.hasPunch
         ? null
         : '${day.clockInAt == null ? '—' : ManilaTime.time(day.clockInAt!)}  →  ${day.clockOutAt == null ? '—' : ManilaTime.time(day.clockOutAt!)}';
 
-    final chips = <(String, Color?)>[
-      if (day.isLate && day.lateMinutes > 0) ('Late ${day.lateMinutes} min', null),
-      if (day.isUndertime && day.undertimeMinutes > 0) ('Undertime ${day.undertimeMinutes} min', null),
-      if (day.isHalfDay) ('Half day', null),
+    final chips = <(String, StatusTone)>[
+      if (day.isLate && day.lateMinutes > 0) ('Late ${day.lateMinutes} min', StatusTone.warning),
+      if (day.isUndertime && day.undertimeMinutes > 0) ('Undertime ${day.undertimeMinutes} min', StatusTone.warning),
+      if (day.isHalfDay) ('Half day', StatusTone.info),
       if (day.leaveTypeName != null)
-        ('${day.leaveTypeName}${day.leaveDayPart != null && day.leaveDayPart != 'full' ? ' (${day.leaveDayPart!.toUpperCase()})' : ''}', null),
-      if (day.holidayTitle != null) (day.holidayTitle!, null),
-      if (day.isMobilePunch) ('Mobile app', null),
-      if (day.outOfRange) ('Out of range', scheme.error),
-      if (day.locationFlagged && !day.outOfRange) ('Flagged for HR', scheme.error),
+        ('${day.leaveTypeName}${day.leaveDayPart != null && day.leaveDayPart != 'full' ? ' (${day.leaveDayPart!.toUpperCase()})' : ''}', StatusTone.success),
+      if (day.holidayTitle != null) (day.holidayTitle!, StatusTone.info),
+      if (day.isMobilePunch) ('Mobile app', StatusTone.info),
+      if (day.outOfRange) ('Out of range', StatusTone.danger),
+      if (day.locationFlagged && !day.outOfRange) ('Flagged for HR', StatusTone.warning),
     ];
 
     final where = [
@@ -250,7 +279,7 @@ class _PersonTile extends StatelessWidget {
     ].join(' · ');
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s3, HrisSpace.s4, HrisSpace.s3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -260,54 +289,43 @@ class _PersonTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(day.employeeName, style: text.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      day.employeeName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+                    ),
                     if (day.employeeCode != null)
-                      Text(day.employeeCode!, style: text.labelSmall?.copyWith(color: scheme.outline)),
+                      Text(day.employeeCode!, style: TextStyle(fontSize: HrisType.xxs, fontWeight: HrisType.semibold, height: 1.3, color: t.muted)),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: badgeColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(badgeText, style: text.labelMedium?.copyWith(color: badgeColor, fontWeight: FontWeight.w600)),
-              ),
+              const SizedBox(width: HrisSpace.s2),
+              StatusBadge(badgeText, tone: badgeTone),
             ],
           ),
           if (times != null) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: HrisSpace.s1 + 2),
             Row(
               children: [
-                Text(times, style: text.bodyMedium),
+                Text(times, style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.text)),
                 if (day.workedLabel.isNotEmpty) ...[
                   const Spacer(),
-                  Text(day.workedLabel, style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                  Text(day.workedLabel, style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted)),
                 ],
               ],
             ),
           ],
           if (where.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(where, style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(where, style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted), maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
           if (chips.isNotEmpty) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: HrisSpace.s2),
             Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                for (final (label, color) in chips)
-                  Chip(
-                    label: Text(label),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    labelStyle: text.labelSmall?.copyWith(color: color),
-                    side: color == null ? null : BorderSide(color: color.withValues(alpha: 0.5)),
-                  ),
-              ],
+              spacing: HrisSpace.s1 + 2,
+              runSpacing: HrisSpace.s1,
+              children: [for (final (label, tone) in chips) StatusBadge(label, tone: tone)],
             ),
           ],
         ],

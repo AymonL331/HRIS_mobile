@@ -64,6 +64,25 @@ hot reload, `q` to quit.
 On the emulator, set a position with `adb emu geo fix <lng> <lat>`. The sandbox's
 Head Office worksite is `adb emu geo fix 121.0175541 14.5513714`.
 
+## Look and feel
+
+The app wears the website's design system. `lib/shared/tokens.dart` carries the web
+tokens (`client/src/styles/tokens.css`) verbatim — page and surface colours, the
+`#2563eb` primary, the four status sets, the radii and the type scale — for light and
+dark; `lib/shared/theme.dart` maps them onto Material 3, and the app follows the
+phone's dark mode the way the website follows `prefers-color-scheme`. Shared widgets
+under `lib/shared/widgets/` are the web components: `AppCard` (the bordered card with
+the soft shadow), `StatusBadge` (the five-tone pill, with the DTR tone mapping from
+`attendanceEnums.js`), `MessageBanner` (the alert with the left accent), `BrandMark`
+(the "● HRIS" mark), `UserAvatar`, `PageHeader` / `SectionLabel`. Read tokens through
+`HrisTokens.of(context)`, never `extension<HrisTokens>()!` — the widget tests mount
+screens under a bare `MaterialApp`.
+
+The launcher icon and splash come from the same mark: `tool/brand/make_icons.ps1`
+draws the sources into `assets/brand/`, `dart run flutter_launcher_icons` builds the
+adaptive icon, and `android/app/src/main/res/values*/splash_colors.xml` carries the
+page colour for both modes.
+
 ## Checks
 
 ```powershell
@@ -82,7 +101,8 @@ uninstall first.
 flutter build apk --release
 ```
 
-The APK lands in `build/app/outputs/flutter-apk/app-release.apk`. Hand it to a
+The APK lands in `build/app/outputs/flutter-apk/app-release.apk` (copied to
+`dist/hris-<version>.apk`, gitignored). Hand it to a
 branch with these steps: allow "Install unknown apps" for the browser or file
 manager, install, open, allow Location → **Precise** → **While using the app**.
 Bump `version:` in `pubspec.yaml` before each release (the build number must

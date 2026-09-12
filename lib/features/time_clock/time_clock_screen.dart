@@ -5,13 +5,18 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/session_controller.dart';
 import '../../core/time/manila_time.dart';
+import '../../shared/button_styles.dart';
+import '../../shared/tokens.dart';
+import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/message_banner.dart';
+import '../../shared/widgets/status_badge.dart';
 import '../consent/consent_screen.dart';
 import 'clock_models.dart';
 import 'time_clock_controller.dart';
 
 /// The home tab. Server time ticking, today's punches, the worksite range, the
-/// two big buttons, and the outcome of the last tap.
+/// two big buttons, and the outcome of the last tap — laid out like the web
+/// My Time Clock page: a centred hero card, then the cards beneath it.
 class TimeClockScreen extends StatefulWidget {
   const TimeClockScreen({super.key});
 
@@ -56,32 +61,39 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
     final tenant = context.read<SessionController>().tenant;
     final now = c.clock.nowUtc();
 
+    // A Column, not a lazy list: the page has a handful of cards and the
+    // outcome banner must exist the moment it is set, even below the fold.
     return RefreshIndicator(
       onRefresh: () => c.load(silent: true),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s2, HrisSpace.s4, HrisSpace.s5),
+        child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (c.loadError != null) ...[
             MessageBanner.warning(c.loadError!, onClose: () => c.load(silent: true)),
-            const SizedBox(height: 12),
+            const SizedBox(height: HrisSpace.s3),
           ],
           _Header(name: status.employeeName, code: status.employeeCode, tenantName: tenant?.name, nowUtc: now),
-          const SizedBox(height: 16),
+          const SizedBox(height: HrisSpace.s3),
           _TodayCard(status: status),
-          const SizedBox(height: 12),
+          const SizedBox(height: HrisSpace.s3),
           _WorksiteCard(controller: c),
-          const SizedBox(height: 20),
+          const SizedBox(height: HrisSpace.s4),
           _PunchButtons(controller: c),
           if (c.outcome != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: HrisSpace.s4),
             _OutcomeCard(outcome: c.outcome!, onDismiss: c.dismissOutcome, onConsent: c.grantConsent),
           ],
         ],
+        ),
       ),
     );
   }
 }
 
+/// The hero card: who, and the server clock in Manila.
 class _Header extends StatelessWidget {
   final String name;
   final String code;
@@ -91,17 +103,40 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(name.isEmpty ? 'Employee' : name, style: text.titleLarge),
-        Text([if (code.isNotEmpty) code, ?tenantName].join(' · '), style: text.bodyMedium),
-        const SizedBox(height: 12),
-        Text(ManilaTime.timeWithSeconds(nowUtc), style: text.displaySmall?.copyWith(fontWeight: FontWeight.w600)),
-        Text(ManilaTime.clock(nowUtc), style: text.bodyLarge),
-        Text('Server time (Manila)', style: text.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline)),
-      ],
+    final t = HrisTokens.of(context);
+    return AppCard(
+      maxWidth: 440,
+      centered: true,
+      padding: const EdgeInsets.all(HrisSpace.s6),
+      child: Column(
+        children: [
+          Text(
+            name.isEmpty ? 'Employee' : name,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
+          ),
+          Text(
+            [if (code.isNotEmpty) code, ?tenantName].join(' · '),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.muted),
+          ),
+          const SizedBox(height: HrisSpace.s4),
+          Text(
+            ManilaTime.timeWithSeconds(nowUtc),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: HrisType.stat,
+              fontWeight: HrisType.semibold,
+              height: 1.15,
+              color: t.text,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: HrisSpace.s1),
+          Text(ManilaTime.clock(nowUtc), textAlign: TextAlign.center, style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.text)),
+          Text('Server time (Manila)', textAlign: TextAlign.center, style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted)),
+        ],
+      ),
     );
   }
 }
@@ -112,40 +147,45 @@ class _TodayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = status.today;
-    final scheme = Theme.of(context).colorScheme;
+    final today = status.today;
+    final t = HrisTokens.of(context);
     Widget stamp(String label, DateTime? at) => Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(height: 2),
-              Text(at == null ? '—' : ManilaTime.time(at),
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(color: at == null ? scheme.outline : null)),
+              Text(
+                label.toUpperCase(),
+                style: TextStyle(fontSize: HrisType.xxs, fontWeight: HrisType.semibold, height: 1.2, color: t.muted, letterSpacing: HrisType.xxs * 0.05),
+              ),
+              const SizedBox(height: HrisSpace.s1),
+              Text(
+                at == null ? '—' : ManilaTime.time(at),
+                style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: at == null ? t.muted : t.text),
+              ),
             ],
           ),
         );
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text('Today', style: Theme.of(context).textTheme.titleMedium),
-                const Spacer(),
-                Text(ManilaTime.shortDate(status.localDate), style: Theme.of(context).textTheme.bodyMedium),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(children: [stamp('Time in', t?.clockInAt), stamp('Time out', t?.clockOutAt)]),
-            if (t?.status != null) ...[
-              const SizedBox(height: 10),
-              Chip(label: Text(_statusLabel(t!.status!)), visualDensity: VisualDensity.compact),
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Today', style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 1.35, color: t.text)),
+              const Spacer(),
+              Text(ManilaTime.shortDate(status.localDate), style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.muted)),
             ],
+          ),
+          const SizedBox(height: HrisSpace.s3),
+          Row(children: [stamp('Time in', today?.clockInAt), stamp('Time out', today?.clockOutAt)]),
+          if (today?.status != null) ...[
+            const SizedBox(height: HrisSpace.s3),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: StatusBadge(_statusLabel(today!.status!), tone: dtrStatusTone(today.status)),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -159,6 +199,9 @@ class _TodayCard extends StatelessWidget {
       };
 }
 
+/// The worksite panel: the range line as the web's verdict pill (success in
+/// range, warning out of range, neutral otherwise), the fix age, and the
+/// check button.
 class _WorksiteCard extends StatelessWidget {
   final TimeClockController controller;
   const _WorksiteCard({required this.controller});
@@ -168,53 +211,67 @@ class _WorksiteCard extends StatelessWidget {
     final ws = controller.status!.worksite;
     final fix = controller.lastFix;
     final range = controller.range;
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
+    final t = HrisTokens.of(context);
 
     String line;
-    Color tone = scheme.onSurfaceVariant;
+    StatusSet? set; // null = neutral
     if (!ws.configured) {
       line = 'No worksite configured for your branch — punches are not range-checked.';
     } else if (fix == null) {
       line = 'Allowed radius ${ws.radiusM} m around ${ws.branchName ?? 'the worksite'}.';
     } else if (range.within == true) {
       line = 'In range — ${range.distanceM} m from ${ws.branchName ?? 'the worksite'} (limit ${ws.radiusM} m).';
-      tone = scheme.primary;
+      set = t.success;
     } else {
       line = 'Out of range — ${range.distanceM} m from ${ws.branchName ?? 'the worksite'} (limit ${ws.radiusM} m).';
-      tone = scheme.error;
+      set = t.warning;
     }
+    final pillBg = set?.bg ?? Color.alphaBlend(t.hover, t.surface);
+    final pillBorder = set?.border ?? t.border;
+    final pillText = set?.text ?? t.muted;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-        child: Row(
-          children: [
-            Icon(ws.configured ? Icons.place_outlined : Icons.location_searching, color: tone),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(line, style: text.bodyMedium?.copyWith(color: tone)),
-                  if (fix != null)
-                    Text(
-                      'GPS ±${fix.accuracyM.round()} m · ${_age(fix.at)}',
-                      style: text.bodySmall?.copyWith(color: scheme.outline),
-                    ),
+    return AppCard(
+      padding: const EdgeInsets.all(HrisSpace.s4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(ws.configured ? Icons.place_outlined : Icons.location_searching, color: set?.text ?? t.muted),
+          const SizedBox(width: HrisSpace.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s3, vertical: HrisSpace.s2),
+                  decoration: BoxDecoration(
+                    color: pillBg,
+                    border: Border.all(color: pillBorder),
+                    borderRadius: BorderRadius.circular(HrisRadius.sm),
+                  ),
+                  child: Text(line, style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.4, color: pillText)),
+                ),
+                if (fix != null) ...[
+                  const SizedBox(height: HrisSpace.s1),
+                  Text(
+                    'GPS ±${fix.accuracyM.round()} m · ${_age(fix.at)}',
+                    style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+                  ),
                 ],
-              ),
+              ],
             ),
-            if (ws.configured)
-              IconButton(
-                tooltip: 'Check my range',
-                onPressed: controller.rangeChecking || controller.busy ? null : controller.checkRange,
-                icon: controller.rangeChecking
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.my_location),
-              ),
+          ),
+          if (ws.configured) ...[
+            const SizedBox(width: HrisSpace.s1),
+            IconButton(
+              tooltip: 'Check my range',
+              onPressed: controller.rangeChecking || controller.busy ? null : controller.checkRange,
+              icon: controller.rangeChecking
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.my_location),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -227,6 +284,9 @@ class _WorksiteCard extends StatelessWidget {
   }
 }
 
+/// The two big buttons, stacked full width like the web `.directions` column:
+/// Time In primary, Time Out secondary (a FilledButton in the secondary
+/// clothes — the tests find both by type).
 class _PunchButtons extends StatelessWidget {
   final TimeClockController controller;
   const _PunchButtons({required this.controller});
@@ -235,6 +295,7 @@ class _PunchButtons extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = controller.status!;
     final busy = controller.busy;
+    final t = HrisTokens.of(context);
     final phaseText = switch (controller.phase) {
       ClockPhase.locating => 'Getting your location…',
       ClockPhase.submitting => 'Recording…',
@@ -243,35 +304,27 @@ class _PunchButtons extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: !busy && s.canClockIn ? () => controller.punch('in') : null,
-                icon: const Icon(Icons.login),
-                label: const Text('Time In'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(64)),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton.tonalIcon(
-                onPressed: !busy && s.canClockOut ? () => controller.punch('out') : null,
-                icon: const Icon(Icons.logout),
-                label: const Text('Time Out'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(64)),
-              ),
-            ),
-          ],
+        FilledButton.icon(
+          onPressed: !busy && s.canClockIn ? () => controller.punch('in') : null,
+          icon: const Icon(Icons.login),
+          label: const Text('Time In'),
+          style: HrisButtonStyles.primaryLg(context),
+        ),
+        const SizedBox(height: HrisSpace.s3),
+        FilledButton.tonalIcon(
+          onPressed: !busy && s.canClockOut ? () => controller.punch('out') : null,
+          icon: const Icon(Icons.logout),
+          label: const Text('Time Out'),
+          style: HrisButtonStyles.secondaryLg(context),
         ),
         if (phaseText != null) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: HrisSpace.s3),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-              const SizedBox(width: 10),
-              Text(phaseText, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(width: HrisSpace.s2 + 2),
+              Text(phaseText, style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.muted)),
             ],
           ),
         ],
@@ -280,11 +333,25 @@ class _PunchButtons extends StatelessWidget {
   }
 }
 
+/// The outcome of the last tap: the web's success / fail mark above the
+/// message banner. The stamped time lives in the one banner sentence.
 class _OutcomeCard extends StatelessWidget {
   final PunchOutcome outcome;
   final VoidCallback onDismiss;
   final VoidCallback onConsent;
   const _OutcomeCard({required this.outcome, required this.onDismiss, required this.onConsent});
+
+  Widget _mark(BuildContext context, {required bool ok}) {
+    final t = HrisTokens.of(context);
+    return Center(
+      child: Container(
+        width: HrisSpace.s6,
+        height: HrisSpace.s6,
+        decoration: BoxDecoration(color: ok ? t.success.solid : t.danger.solid, shape: BoxShape.circle),
+        child: Icon(ok ? Icons.check : Icons.priority_high, size: 20, color: t.primaryContrast),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -300,11 +367,25 @@ class _OutcomeCard extends StatelessWidget {
           if (response.flagged && response.within != false) 'Flagged for HR: ${response.flagReason ?? 'see DTR'}.',
           if (warnLowAccuracy) 'Your GPS reading was coarse, so the punch is flagged for review.',
         ];
-        return MessageBanner.success(parts.join(' '), onClose: onDismiss);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _mark(context, ok: true),
+            const SizedBox(height: HrisSpace.s3),
+            MessageBanner.success(parts.join(' '), onClose: onDismiss),
+          ],
+        );
       case PunchInfo(:final message):
         return MessageBanner.info(message, onClose: onDismiss);
       case PunchBlocked(:final message):
-        return MessageBanner.error('$message Move closer to your worksite and try again.', onClose: onDismiss);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _mark(context, ok: false),
+            const SizedBox(height: HrisSpace.s3),
+            MessageBanner.error('$message Move closer to your worksite and try again.', onClose: onDismiss),
+          ],
+        );
       case PunchFailure(:final message):
         return MessageBanner.error(message, onClose: onDismiss);
       case PunchNeedsConsent():
@@ -312,7 +393,7 @@ class _OutcomeCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const MessageBanner.warning('Your location consent is not on record yet.'),
-            const SizedBox(height: 8),
+            const SizedBox(height: HrisSpace.s2),
             OutlinedButton(onPressed: onConsent, child: const Text('Review and give consent')),
           ],
         );
@@ -327,16 +408,21 @@ class _LoadError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              MessageBanner.error(message),
-              const SizedBox(height: 12),
-              OutlinedButton(onPressed: () => onRetry(), child: const Text('Try again')),
-            ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(HrisSpace.s4),
+          child: AppCard(
+            tone: AppCardTone.danger,
+            maxWidth: 440,
+            centered: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                MessageBanner.error(message),
+                const SizedBox(height: HrisSpace.s3),
+                OutlinedButton(onPressed: () => onRetry(), child: const Text('Try again')),
+              ],
+            ),
           ),
         ),
       );

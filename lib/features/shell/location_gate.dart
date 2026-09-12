@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/session_controller.dart';
 import '../../core/location/location_gate_service.dart';
+import '../../shared/tokens.dart';
+import '../../shared/widgets/app_card.dart';
 
 /// Wraps everything a signed-in user can see. While the device cannot give a
 /// precise location the child is NOT built — a full-screen explanation stands
@@ -106,32 +108,36 @@ class LocationBlockedScreen extends StatelessWidget {
       GateVerdict.ok => (Icons.check, '', '', '', onRetry),
     };
 
+    // The web's full-page block: one card on the page background, a danger
+    // icon, the reason, the way out.
+    final t = HrisTokens.of(context);
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+            padding: const EdgeInsets.all(HrisSpace.s5),
+            child: AppCard(
+              maxWidth: 420,
+              padding: const EdgeInsets.all(HrisSpace.s6),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(icon, size: 72, color: scheme.error),
-                  const SizedBox(height: 20),
-                  Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 12),
-                  Text(body, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.4)),
-                  const SizedBox(height: 28),
+                  Icon(icon, size: 56, color: scheme.error),
+                  const SizedBox(height: HrisSpace.s4),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: HrisType.heading, fontWeight: HrisType.semibold, height: 1.25, color: t.text),
+                  ),
+                  const SizedBox(height: HrisSpace.s3),
+                  Text(body, textAlign: TextAlign.center, style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted)),
+                  const SizedBox(height: HrisSpace.s5),
                   FilledButton(onPressed: () => primaryAction(), child: Text(primaryLabel)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: HrisSpace.s3),
                   if (verdict != GateVerdict.permissionDenied)
-                    OutlinedButton(
-                      onPressed: () => onRetry(),
-                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                      child: const Text('Check again'),
-                    ),
-                  const SizedBox(height: 24),
+                    OutlinedButton(onPressed: () => onRetry(), child: const Text('Check again')),
+                  const SizedBox(height: HrisSpace.s4),
                   TextButton(
                     onPressed: () => context.read<SessionController>().logout(),
                     child: const Text('Sign out'),

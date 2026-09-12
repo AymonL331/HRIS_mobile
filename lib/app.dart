@@ -19,7 +19,11 @@ class HrisApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'HRIS',
-      theme: buildTheme(),
+      // Light and dark from the web tokens; the phone's setting decides, like
+      // the website's prefers-color-scheme.
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
       home: const AppRoot(),
     );

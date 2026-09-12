@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The web dark-mode page colour and brand dot (prefers-color-scheme: dark). -->
+<resources>
+    <color name="splash_bg">#0f172a</color>
+    <color name="splash_dot">#3b82f6</color>
+</resources>

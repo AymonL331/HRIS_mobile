@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/http/api_exception.dart';
 import '../../core/http/endpoints.dart';
+import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/message_banner.dart';
 
 /// Mirrors validators/auth.validator.js#validateChangePassword, plus the
@@ -106,11 +107,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             TextButton(onPressed: _busy ? null : () => session.logout(), child: const Text('Sign out')),
         ],
       ),
+      // The web ChangePasswordPage: the same auth card as the login.
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Center(
+          child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+          child: AppCard(
+            maxWidth: 420,
+            padding: const EdgeInsets.all(32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -170,6 +174,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );
