@@ -137,6 +137,10 @@ void main() {
     expect(find.textContaining('ALL THE TIME'), findsOneWidget);
     expect(find.textContaining('even when it is closed'), findsOneWidget);
     expect(find.textContaining('only at the moment you clock'), findsNothing);
+    // Work-hours tracking (2026-09-14): the actual scope, not "may extend".
+    expect(find.textContaining('until you clock out'), findsOneWidget);
+    expect(find.textContaining('kept for 90 days'), findsOneWidget);
+    expect(find.textContaining('may extend'), findsNothing);
     // And it must not promise a website withdrawal route that does not exist.
     expect(find.textContaining('withdraw this consent from the HRIS website'), findsNothing);
     await tester.pumpWidget(const SizedBox());

@@ -13,6 +13,8 @@ import '../../shared/widgets/status_badge.dart';
 import '../consent/consent_screen.dart';
 import '../face/face_capture_screen.dart';
 import '../face/face_models.dart';
+import '../tracking/tracking_service.dart';
+import '../tracking/tracking_status_card.dart';
 import 'clock_models.dart';
 import 'time_clock_controller.dart';
 
@@ -94,6 +96,19 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
           _TodayCard(status: status),
           const SizedBox(height: HrisSpace.s3),
           _WorksiteCard(controller: c),
+          if (status.tracking.active && c.tracking != null)
+            ValueListenableBuilder<TrackingSnapshot>(
+              valueListenable: c.tracking!.snapshot,
+              builder: (_, snap, _) => Padding(
+                padding: const EdgeInsets.only(top: HrisSpace.s3),
+                child: TrackingStatusCard(
+                  state: status.tracking,
+                  snapshot: snap,
+                  nowUtc: now,
+                  onRestart: () => c.load(silent: true),
+                ),
+              ),
+            ),
           const SizedBox(height: HrisSpace.s4),
           _PunchButtons(controller: c, captureOverride: widget.captureOverride),
           if (c.outcome != null) ...[

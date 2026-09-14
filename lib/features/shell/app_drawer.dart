@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/auth/session_controller.dart';
+import '../../shared/button_styles.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/brand_mark.dart';
 import '../../shared/widgets/page_header.dart';
@@ -14,12 +17,7 @@ class NavDestination {
   final IconData icon;
   final IconData selectedIcon;
 
-  const NavDestination({
-    required this.index,
-    required this.label,
-    required this.icon,
-    required this.selectedIcon,
-  });
+  const NavDestination({required this.index, required this.label, required this.icon, required this.selectedIcon});
 }
 
 /// A titled group of destinations — the web sidebar's `.section` with its
@@ -39,12 +37,22 @@ class NavSection {
 ///
 /// The active item wears `--color-primary-soft` with primary text, exactly as
 /// `.itemActive` does on the web.
+///
+/// SIGN OUT is pinned to the drawer's FOOTER (user, 2026-09-14 — it used to sit
+/// at the bottom of Settings, two taps and a scroll away). The footer, not the
+/// list, because it is an ACTION that ends the session, not a place to go: kept
+/// apart from the destinations by a hairline so it cannot be mistaken for one or
+/// hit while reaching for Settings, and fixed in place so it never moves as
+/// destinations are added. It still asks before signing out.
 class AppDrawer extends StatelessWidget {
   final List<NavSection> sections;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
   final String username;
   final String? roleName;
+
+  /// Called after the drawer closes when Sign out is tapped. No footer when null.
+  final VoidCallback? onSignOut;
 
   const AppDrawer({
     super.key,
@@ -53,6 +61,7 @@ class AppDrawer extends StatelessWidget {
     required this.onSelect,
     required this.username,
     this.roleName,
+    this.onSignOut,
   });
 
   @override
@@ -71,7 +80,9 @@ class AppDrawer extends StatelessWidget {
             Container(
               height: HrisSize.topBar,
               padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s5),
-              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.border))),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: t.border)),
+              ),
               alignment: Alignment.centerLeft,
               child: const BrandMark(),
             ),
@@ -134,7 +145,81 @@ class AppDrawer extends StatelessWidget {
                 ],
               ),
             ),
+            if (onSignOut != null)
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: t.border)),
+                ),
+                padding: const EdgeInsets.all(HrisSpace.s3),
+                child: _SignOutItem(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onSignOut!();
+                  },
+                ),
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Ask, then sign out. Shared by every place that offers Sign out, so the
+/// wording and the danger styling are defined once.
+Future<void> confirmSignOut(BuildContext context) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Sign out?'),
+      content: const Text("You'll need your company code, username and password to sign back in."),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: HrisButtonStyles.danger(ctx),
+          child: const Text('Sign out'),
+        ),
+      ],
+    ),
+  );
+  if (ok == true && context.mounted) await context.read<SessionController>().logout();
+}
+
+/// The footer's Sign out: shaped like a destination row, in the danger tone so
+/// it reads as leaving rather than going somewhere.
+class _SignOutItem extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _SignOutItem({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = HrisTokens.of(context);
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(HrisRadius.sm),
+        child: Padding(
+          padding: const EdgeInsets.all(HrisSpace.s3),
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 20, color: t.danger.text),
+              const SizedBox(width: HrisSpace.s3),
+              Expanded(
+                child: Text(
+                  'Sign out',
+                  style: TextStyle(
+                    fontSize: HrisType.sm,
+                    fontWeight: FontWeight.w500,
+                    height: 1.35,
+                    color: t.danger.text,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

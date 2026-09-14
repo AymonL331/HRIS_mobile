@@ -7,6 +7,7 @@ import 'package:hris_mobile/core/auth/session_controller.dart';
 import 'package:hris_mobile/core/auth/session_store.dart';
 import 'package:hris_mobile/core/config/env_store.dart';
 import 'package:hris_mobile/core/location/location_fix.dart';
+import 'package:hris_mobile/core/device/device_readiness_service.dart';
 import 'package:hris_mobile/core/location/location_gate_service.dart';
 import 'package:hris_mobile/features/face/face_models.dart';
 import 'package:hris_mobile/features/time_clock/clock_api.dart';
@@ -62,6 +63,7 @@ void main() {
         ChangeNotifierProvider<EnvStore>.value(value: envStore),
         ChangeNotifierProvider<SessionController>.value(value: session),
         Provider<LocationGateService>.value(value: _AlwaysOk()),
+        Provider<DeviceReadinessService>.value(value: _Ready()),
         Provider<LocationFixService>.value(value: _NoFix()),
         Provider<ClockApi?>.value(value: _StubClock()),
       ],
@@ -131,9 +133,28 @@ class _StubClock implements ClockApi {
 
 class _AlwaysOk implements LocationGateService {
   @override
-  Future<GateVerdict> check({bool interactive = false}) async => GateVerdict.ok;
+  Future<GateVerdict> check() async => GateVerdict.ok;
+  @override
+  Future<GateVerdict> requestForeground() async => GateVerdict.ok;
+  @override
+  Future<GateVerdict> requestBackground() async => GateVerdict.ok;
   @override
   Future<void> openAppSettings() async {}
   @override
   Future<void> openLocationSettings() async {}
+}
+
+class _Ready implements DeviceReadinessService {
+  @override
+  Future<DeviceReadiness> check() async => DeviceReadiness.ready;
+  @override
+  Future<void> requestNotifications() async {}
+  @override
+  Future<void> requestBatteryExemption() async {}
+  @override
+  Future<void> openAppSettings() async {}
+  @override
+  Future<Set<String>> skippedSteps() async => const {};
+  @override
+  Future<void> skipStep(String name) async {}
 }

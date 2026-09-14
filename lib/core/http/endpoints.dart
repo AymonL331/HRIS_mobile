@@ -22,6 +22,11 @@ abstract final class Endpoints {
   /// which is a wider collection than the punch-time geotag the web consent
   /// describes. Mobile-token only; a web session gets 403 MOBILE_ONLY.
   static const mobileLocationConsent = '/api/me/mobile-location-consent';
+
+  /// WORK-HOURS LOCATION TRACKING (server migration 060): the batches of points
+  /// the tracking service recorded between clock-in and clock-out, including the
+  /// ones queued offline. Mobile-token only.
+  static const trackingPings = '/api/me/tracking/pings';
   static const attendanceCalendar = '/api/me/attendance/calendar';
 
   /// My payslips. Ownership-scoped on the server (`resolveSelf` forces the

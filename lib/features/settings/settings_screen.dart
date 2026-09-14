@@ -4,37 +4,20 @@ import 'package:provider/provider.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/config/app_env.dart';
 import '../../core/config/env_store.dart';
-import '../../shared/button_styles.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/page_header.dart';
 
-/// Who is signed in, where the app is pointed, the version, and the way out.
+/// Who is signed in, where the app is pointed, and the version.
+///
+/// Sign out is NOT here any more: it lives in the sidebar's footer, one tap from
+/// anywhere (user, 2026-09-14 — see AppDrawer).
 ///
 /// Deliberately carries NO change-password action: a password reset starts with
 /// HR issuing a temporary credential, and the holder replaces it through the
 /// forced screen on their next sign-in. See the Password tile below.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
-  Future<void> _confirmLogout(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sign out?'),
-        content: const Text("You'll need your company code, username and password to sign back in."),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: HrisButtonStyles.danger(ctx),
-            child: const Text('Sign out'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && context.mounted) await context.read<SessionController>().logout();
-  }
 
   Future<void> _switchEnv(BuildContext context) async {
     final current = context.read<EnvStore>().config.selected;
@@ -78,19 +61,19 @@ class SettingsScreen extends StatelessWidget {
     // Each group is a web card of rows under an uppercase section label; the
     // rows are the same tiles as before.
     Widget group(List<Widget> tiles) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s4),
-          child: AppCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (var i = 0; i < tiles.length; i += 1) ...[
-                  if (i > 0) Divider(height: 1, indent: HrisSpace.s4, color: t.border),
-                  tiles[i],
-                ],
-              ],
-            ),
-          ),
-        );
+      padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s4),
+      child: AppCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            for (var i = 0; i < tiles.length; i += 1) ...[
+              if (i > 0) Divider(height: 1, indent: HrisSpace.s4, color: t.border),
+              tiles[i],
+            ],
+          ],
+        ),
+      ),
+    );
 
     return ListView(
       padding: const EdgeInsets.only(bottom: HrisSpace.s5),
@@ -100,7 +83,9 @@ class SettingsScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.person_outline),
             title: Text(user?.username ?? '—'),
-            subtitle: Text([if (tenant != null) tenant.name, if (user?.email.isNotEmpty ?? false) user!.email].join(' · ')),
+            subtitle: Text(
+              [if (tenant != null) tenant.name, if (user?.email.isNotEmpty ?? false) user!.email].join(' · '),
+            ),
           ),
           // NOT a button. Changing a password starts with HR, not with the
           // holder: they reset the login, the server issues a temporary
@@ -137,24 +122,7 @@ class SettingsScreen extends StatelessWidget {
             subtitle: Text(session.appVersion),
           ),
         ]),
-        const SizedBox(height: HrisSpace.s5),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s4),
-          child: OutlinedButton.icon(
-            onPressed: () => _confirmLogout(context),
-            icon: const Icon(Icons.logout),
-            label: const Text('Sign out'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: t.danger.text,
-              iconColor: t.danger.text,
-              side: BorderSide(color: t.danger.border),
-              minimumSize: const Size.fromHeight(48),
-            ),
-          ),
-        ),
       ],
     );
   }
 }
-
-

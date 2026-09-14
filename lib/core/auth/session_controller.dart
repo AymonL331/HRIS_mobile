@@ -76,6 +76,12 @@ class SessionController extends ChangeNotifier {
 
   Tenant? get tenant => _record?.tenant;
 
+  /// A token is held for this environment. False only after a real sign-out
+  /// (or before any sign-in) — a cold start that could not reach the server
+  /// shows the login screen but KEEPS the token, and must not end a shift's
+  /// location recording.
+  bool get hasStoredSession => _record != null;
+
   /// The API client for the current environment (rebuilt on a URL change).
   ApiClient get client {
     final base = _env.config.baseUrl;

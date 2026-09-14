@@ -69,18 +69,28 @@ GateVerdict decideGate({
   return GateVerdict.ok;
 }
 
-/// Gathers the three inputs and opens the two settings pages. Abstract so the
-/// gate widget can be tested with a scripted fake.
+/// Reads the verdict, and raises the permission prompts ONLY when asked to.
+/// Abstract so the setup wizard can be tested with a scripted fake.
+///
+/// CHECKING NEVER PROMPTS (2026-09-14, the setup wizard). The gate used to raise
+/// the location dialog the moment a signed-in employee arrived, before any
+/// explanation, and then chain the "all the time" request — which on Android
+/// 11+ opens Settings with no instruction at all. Now [check] only observes, and
+/// each prompt is its own method, called only from the button that sits under
+/// the explanation of what is about to appear.
 abstract class LocationGateService {
-  /// Checks service, permission and accuracy, then returns the verdict.
-  ///
-  /// [interactive] says whether this check may raise the system permission
-  /// dialogs. TRUE for a check the user caused (first mount, "Try again"); FALSE
-  /// for a passive re-check (the app resumed), which must only observe. Getting
-  /// this wrong is how you build a loop: the app re-checks on every resume, and
-  /// returning from Settings IS a resume, so a prompting resume-check would
-  /// bounce the user straight back out again.
-  Future<GateVerdict> check({bool interactive = false});
+  /// Service, permission and accuracy → verdict. Never raises a dialog, so it
+  /// is safe on mount and on every resume (returning from Settings IS a resume).
+  Future<GateVerdict> check();
+
+  /// The first location dialog (foreground: Precise/Approximate + While using /
+  /// Only this time / Don't allow). Only meaningful while undecided.
+  Future<GateVerdict> requestForeground();
+
+  /// Gets the employee to "Allow all the time" (and "Use precise location"):
+  /// the Android 11+ Location-permission page, or App info when Android has
+  /// stopped routing there.
+  Future<GateVerdict> requestBackground();
 
   Future<void> openLocationSettings();
 
@@ -97,17 +107,18 @@ class GeolocatorGateService implements LocationGateService {
   /// is no `deniedForever` in it; that verdict can only be learned from a
   /// REQUEST. So without this flag the sequence observed on a device was:
   ///
-  ///   mount   (interactive) -> deniedForever  -> the Settings screen, correct
-  ///   resume  (passive)     -> denied         -> OVERWRITES it, back to "Try
-  ///                                              again", which does nothing
+  ///   request            -> deniedForever  -> the Settings screen, correct
+  ///   resume  (passive)  -> denied         -> OVERWRITES it, back to a button
+  ///                                           that can never work
   ///
-  /// and since a resume fires immediately after the request, the employee only
-  /// ever saw the dead Try again button. Once set, a passive re-check may not
-  /// downgrade it; it is cleared the moment the permission actually improves.
+  /// Once set, a passive check may not downgrade it; it is cleared the moment
+  /// the permission actually improves.
   bool _androidWillNotAsk = false;
 
+  bool _requestingForeground = false;
+
   @override
-  Future<GateVerdict> check({bool interactive = false}) async {
+  Future<GateVerdict> check() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     var permission = await Geolocator.checkPermission();
 
@@ -115,41 +126,9 @@ class GeolocatorGateService implements LocationGateService {
     // Settings), so forget what we knew.
     if (permission != LocationPermission.denied) _androidWillNotAsk = false;
 
-    // A passive re-check cannot rediscover `deniedForever`, so preserve it.
-    if (!interactive && permission == LocationPermission.denied && _androidWillNotAsk) {
+    // A passive check cannot rediscover `deniedForever`, so preserve it.
+    if (permission == LocationPermission.denied && _androidWillNotAsk) {
       permission = LocationPermission.deniedForever;
-    }
-
-    // (1) FOREGROUND — only when nothing is decided yet.
-    //
-    // DO NOT relax this condition. Now that ACCESS_BACKGROUND_LOCATION is in the
-    // manifest, geolocator's own requestPermission() (PermissionManager.java)
-    // appends BACKGROUND to the same requestPermissions() call whenever the
-    // current status is already `whileInUse` — and Android 11+ SILENTLY IGNORES
-    // a request that mixes foreground and background location, granting neither
-    // and showing no dialog. Calling it only from `denied` keeps that branch
-    // unreachable. The background ask below is a separate, isolated request.
-    if (interactive && permission == LocationPermission.denied) {
-      permission = await _requestForeground();
-    }
-
-    // (2) BACKGROUND — a separate request, and only once foreground is held.
-    //
-    // Via permission_handler, which asks for ACCESS_BACKGROUND_LOCATION ALONE —
-    // the only shape Android 11+ accepts. On API 30+ this commonly shows no
-    // dialog at all (it returns denied, or routes to Settings), which is why the
-    // blocked screen — not this call — is what actually gets most people to
-    // "Allow all the time". Never called on a passive re-check.
-    if (interactive && permission == LocationPermission.whileInUse) {
-      try {
-        // Timed out for the same reason as the foreground ask: a permission
-        // future that never completes must never be able to wedge the gate.
-        await ph.Permission.locationAlways.request().timeout(const Duration(seconds: 60));
-      } catch (_) {
-        // A refusing or hanging platform channel must not brick the gate; the
-        // re-read below simply reports whatever is actually true.
-      }
-      permission = await Geolocator.checkPermission();
     }
 
     var accuracy = LocationAccuracyStatus.unknown;
@@ -163,6 +142,65 @@ class GeolocatorGateService implements LocationGateService {
     return decideGate(serviceEnabled: serviceEnabled, permission: permission, accuracy: accuracy);
   }
 
+  @override
+  Future<GateVerdict> requestForeground() async {
+    // A double tap must not start a second request while the dialog is up.
+    if (_requestingForeground) return check();
+    _requestingForeground = true;
+    try {
+      // DO NOT relax this condition. Now that ACCESS_BACKGROUND_LOCATION is in
+      // the manifest, geolocator's own requestPermission() (PermissionManager
+      // .java) appends BACKGROUND to the same requestPermissions() call whenever
+      // the current status is already `whileInUse` — and Android 11+ SILENTLY
+      // IGNORES a request that mixes foreground and background location,
+      // granting neither and showing no dialog. Calling it only from `denied`
+      // keeps that branch unreachable; background is [requestBackground].
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied && !_androidWillNotAsk) {
+        await _requestForeground();
+      }
+    } finally {
+      _requestingForeground = false;
+    }
+    return check();
+  }
+
+  @override
+  Future<GateVerdict> requestBackground() async {
+    final permission = await Geolocator.checkPermission();
+    if (permission != LocationPermission.whileInUse) {
+      // Blocked for good, or Always already held but Approximate: no request
+      // can fix either. The app's Settings page always can.
+      await openAppSettings();
+      return check();
+    }
+
+    // Via permission_handler, which asks for ACCESS_BACKGROUND_LOCATION ALONE —
+    // the only shape Android 11+ accepts. There it shows no dialog: it opens the
+    // app's Location-permission page, and the future completes only when the
+    // employee comes back. So do NOT await it (the resume check reports the
+    // result); wait just long enough to tell whether anything opened at all.
+    final done = Completer<void>();
+    unawaited(
+      ph.Permission.locationAlways
+          .request()
+          .then<void>((_) {}, onError: (Object _) {})
+          .whenComplete(() {
+        if (!done.isCompleted) done.complete();
+      }),
+    );
+    final returnedAtOnce = await done.future
+        .then((_) => true)
+        .timeout(const Duration(milliseconds: 800), onTimeout: () => false);
+
+    if (returnedAtOnce && await Geolocator.checkPermission() == LocationPermission.whileInUse) {
+      // Came straight back with nothing changed: Android showed nothing (it
+      // stops routing to the page after repeated refusals). App info works.
+      await openAppSettings();
+    }
+    return check();
+  }
+
   /// Ask for foreground location, defending against the two ways this can leave
   /// the gate stuck rather than merely refused.
   ///
@@ -172,19 +210,15 @@ class GeolocatorGateService implements LocationGateService {
   /// with an EMPTY grantResults array. geolocator logs
   /// "The grantResults array is empty" and returns early **without invoking its
   /// result callback**, so the Dart future from `Geolocator.requestPermission()`
-  /// NEVER COMPLETES. The gate's re-entrancy guard then stays raised and every
-  /// later tap of "Try again" does nothing at all. The screen looks frozen.
+  /// NEVER COMPLETES.
   ///
   /// Two defences, because either alone is not enough:
-  ///  1. Ask permission_handler FIRST whether the permission is permanently
-  ///     denied. It reads `shouldShowRequestPermissionRationale`, which is the
-  ///     signal geolocator's `checkPermission()` cannot report — it only ever
-  ///     returns denied / whileInUse / always. If Android will not ask, we do
-  ///     not ask: we return `deniedForever` so the employee gets the screen with
-  ///     the Settings button instead of a Try again that cannot work.
-  ///  2. Even then, TIME OUT the request. A future that never completes must
-  ///     never be able to wedge the gate again, whatever a future plugin
-  ///     version does.
+  ///  1. After a refusal, ask permission_handler whether Android will ask again
+  ///     (`shouldShowRequestPermissionRationale`, which geolocator cannot report).
+  ///     If it will not, remember `deniedForever` so the employee gets the
+  ///     Settings instructions instead of a button that cannot work.
+  ///  2. TIME OUT the request. A future that never completes must never be able
+  ///     to wedge the screen, whatever a future plugin version does.
   Future<LocationPermission> _requestForeground() async {
     LocationPermission result;
     try {
@@ -198,17 +232,11 @@ class GeolocatorGateService implements LocationGateService {
     }
     if (result != LocationPermission.denied) return result;
 
-    // We asked and were refused. CAN WE ASK AGAIN? This is the question that
-    // matters, and it can only be answered HERE — after a request. Android's
-    // `shouldShowRequestPermissionRationale` is false both when a permission is
-    // permanently denied AND when it has never been asked for, so consulting it
-    // BEFORE asking cannot tell those apart. After asking, the ambiguity is
-    // gone: false now means Android will not show the dialog again.
-    //
-    // Without this the gate sat on "Allow location access" forever — every tap
-    // of Try again re-ran a request the OS silently refused, and the screen
-    // re-rendered the identical verdict, which reads to the employee as a dead
-    // button.
+    // We asked and were refused. CAN WE ASK AGAIN? This can only be answered
+    // HERE — after a request. `shouldShowRequestPermissionRationale` is false
+    // both when a permission is permanently denied AND when it has never been
+    // asked for, so consulting it BEFORE asking cannot tell those apart. After
+    // asking, false means Android will not show the dialog again.
     try {
       final canAskAgain = await ph.Permission.locationWhenInUse.shouldShowRequestRationale
           .timeout(const Duration(seconds: 5));

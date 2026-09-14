@@ -63,7 +63,41 @@ The app refuses to run unless location is granted **"Allow all the time"** with
 decision is one pure function, `decideGate` in
 `lib/core/location/location_gate_service.dart`, so it reads as a truth table:
 only `always` + precise (or `unknown`, which is pre-Android-12) passes.
-Everything else renders a full-screen block naming the exact Settings taps.
+
+### The phone-setup wizard
+
+Anything short of that shows the **setup wizard** (`lib/features/setup/`) in place of
+the app — one step per screen, "Step n of 5", each **explaining what is about to
+appear before Android shows it**, with a drawing of that Android screen marking the
+choice to tap and striking out the wrong ones:
+
+| Step | Shown when | The button does |
+|---|---|---|
+| 1 Turn on location | location service off | opens location settings |
+| 2 Allow location access | undecided / "Don't allow" | raises the first dialog — *keep Precise, tap While using the app **or** Only this time* (both land on step 3, which replaces either with Allow all the time; only Don't allow is struck out) |
+| 3 Allow all the time | while-in-use, Approximate, or blocked for good | opens the Location-permission page (App info when Android won't route there) |
+| 4 Allow notifications | Android 13+, not granted | the notification dialog (skippable) |
+| 5 Run in the background | battery optimisation on | the "always run in background?" dialog + a brand hint for Xiaomi/OPPO/vivo/Samsung/… (skippable) |
+
+Why (user, 2026-09-14): the old gate raised Android's dialog the moment the employee
+signed in, with no guidance, and then chained the "all the time" request — which on
+Android 11+ throws the user into Settings with no instruction; the explanation only
+appeared after they pressed Back. **Nothing prompts on its own any more**: the mount
+and every resume only observe (`LocationGateService.check()`); a dialog or Settings
+page appears only from the button under its explanation (`requestForeground()`,
+`requestBackground()`). The truth table from verdict to step is `nextSetupStep` in
+`setup_step.dart`. Location steps cannot be skipped; a skipped optional step is
+remembered (`setup.skipped` in SharedPreferences).
+
+**Back** (the arrow, or the phone's back gesture) re-shows the previous step to
+re-read — it never undoes anything, because the step is decided by what the phone
+has granted. A re-read step says it is already done and offers only **Next**; no
+dialog or Settings page opens from it, and real progress (a resume after granting)
+ends the re-read. The first step has no Back, and there the gesture leaves the app
+as before.
+
+The drawings are Flutter widgets, not screenshots: the real screens differ by Android
+version and brand, while the *words* on them do not.
 
 Two Android facts shape this, and neither is negotiable:
 
@@ -81,14 +115,41 @@ background, granting neither, with no dialog**. So it is only ever called from
 `denied`, and the background ask goes through `permission_handler` alone. Do not
 add a second `Geolocator.requestPermission()` call anywhere.
 
-The gate re-checks on every app resume, but only the **mount** and the **retry
-buttons** may raise a dialog (`check(interactive: true)`). Returning from Settings
-is itself a resume, so a prompting resume-check would bounce the user straight
-back out in a loop.
+The gate re-checks on every app resume, and a check **never** raises a dialog.
+Returning from Settings is itself a resume, so a prompting resume-check would bounce
+the user straight back out in a loop. Every permission request is timed out (an
+empty `grantResults` leaves geolocator's future hanging forever), and
+`deniedForever` — which `checkPermission()` can never report — is remembered once a
+request learns it.
 
-Holding the permission does **not** by itself collect anything while the app is
-closed — that needs a foreground service with a persistent notification, and is a
-separate feature. This is the groundwork.
+## Work-hours location tracking (1.5.0)
+
+From an employee's clock-in until their clock-out the app records where they are,
+even with the screen off or the app swiped away, and HR reads the trail on the
+website (server migration 060). Outside a shift nothing is recorded.
+
+- **The server decides.** Every status load (and so every punch) calls
+  `TrackingService.sync(status.tracking)`: the service runs while the server says the
+  employee's open shift is active, and stops otherwise. The sampling policy (25 m /
+  30 s / 5-min heartbeat / 16 h cap) comes from that same block.
+- **The service** (`lib/features/tracking/tracking_task_handler.dart`) runs in
+  `flutter_foreground_task`'s own engine behind a notification ("HRIS is recording
+  your work location"): a position stream + heartbeat fixes → a `sqflite` queue →
+  `POST /api/me/tracking/pings` every 2 min or 20 points, with backoff while offline.
+  Location switched off, permission removed and a restart after a kill are recorded
+  as events so the trail explains its own gaps. It stops itself when an upload says
+  the shift closed, the session ended (queue kept) or consent was withdrawn (queue
+  cleared), or at 16 h.
+- **What survives what:** swipe-away (`stopWithTask=false`), a kill (auto-restart →
+  `resumed_after_kill`), a reboot (`autoRunOnBoot`), offline stretches (the queue). A
+  real sign-out or an environment switch stops it; an offline cold start that only
+  shows the login screen does not.
+- **The uploader's rules** (`ping_uploader.dart`, unit-tested): delete only after a
+  2xx; network/5xx/ngrok page = retry later; 401 / access off = stop, keep the queue;
+  consent withdrawn = stop, clear the queue; 404 = drop that shift; 422 envelope =
+  drop the batch so it can never jam the queue. One shift per batch, oldest first.
+- **On the Time Clock** a card says whether recording is on (last point, points
+  waiting), or that the shift is open but this phone is not recording, with Restart.
 
 ## The face check
 

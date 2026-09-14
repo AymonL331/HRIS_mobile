@@ -1,4 +1,8 @@
 import 'package:hris_mobile/core/location/location_fix.dart';
+import 'package:flutter/foundation.dart';
+import 'package:hris_mobile/core/device/device_readiness_service.dart';
+import 'package:hris_mobile/features/tracking/tracking_models.dart';
+import 'package:hris_mobile/features/tracking/tracking_service.dart';
 import 'package:hris_mobile/core/location/location_gate_service.dart';
 import 'package:hris_mobile/features/face/face_capture_screen.dart';
 import 'package:hris_mobile/features/face/face_models.dart';
@@ -14,7 +18,10 @@ Map<String, dynamic> statusJson({
   /// Separate from [consent] so a test can drive the two apart and prove the
   /// web's flag does not unlock the phone.
   bool mobileConsent = true,
+  /// The work-hours `tracking` block; omitted (= an older server) when null.
+  Map<String, dynamic>? tracking,
 }) => {
+      'tracking': ?tracking,
       'server_time': '2026-09-11T00:12:33.000Z',
       'timezone': 'Asia/Manila',
       'local_date': '2026-09-11',
@@ -138,9 +145,52 @@ class FakeFixService implements LocationFixService {
 
 class AlwaysOkGate implements LocationGateService {
   @override
-  Future<GateVerdict> check({bool interactive = false}) async => GateVerdict.ok;
+  Future<GateVerdict> check() async => GateVerdict.ok;
+  @override
+  Future<GateVerdict> requestForeground() async => GateVerdict.ok;
+  @override
+  Future<GateVerdict> requestBackground() async => GateVerdict.ok;
   @override
   Future<void> openAppSettings() async {}
   @override
   Future<void> openLocationSettings() async {}
+}
+
+/// Records what the controller asked the tracking service to do.
+class FakeTrackingService implements TrackingService {
+  final ValueNotifier<TrackingSnapshot> notifier = ValueNotifier(TrackingSnapshot.idle);
+  final synced = <TrackingState>[];
+  final stops = <String>[];
+
+  @override
+  ValueListenable<TrackingSnapshot> get snapshot => notifier;
+
+  @override
+  Future<void> sync(TrackingState state) async => synced.add(state);
+
+  @override
+  Future<void> stop({String reason = 'clocked_out'}) async => stops.add(reason);
+}
+
+Map<String, dynamic> trackingJson({bool active = true, int? attendanceLogId = 1}) => {
+      'active': active,
+      'attendance_log_id': attendanceLogId,
+      'since': active ? '2026-09-11T00:13:00.000Z' : null,
+      'policy': {'distance_filter_m': 25, 'min_interval_s': 30, 'heartbeat_s': 300, 'max_shift_hours': 16},
+    };
+
+/// Notifications granted, battery unrestricted: the setup wizard never shows.
+class AlwaysReadyDevice implements DeviceReadinessService {
+  @override
+  Future<DeviceReadiness> check() async => DeviceReadiness.ready;
+  @override
+  Future<void> requestNotifications() async {}
+  @override
+  Future<void> requestBatteryExemption() async {}
+  @override
+  Future<void> openAppSettings() async {}
+  @override
+  Future<Set<String>> skippedSteps() async => const {};
+  @override
+  Future<void> skipStep(String name) async {}
 }

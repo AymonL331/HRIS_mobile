@@ -21,8 +21,20 @@ import '../settings/settings_screen.dart';
 import '../time_clock/clock_api.dart';
 import '../time_clock/time_clock_controller.dart';
 import '../time_clock/time_clock_screen.dart';
+import '../tracking/tracking_service.dart';
 import 'app_drawer.dart';
 import 'no_employee_screen.dart';
+
+/// The app's tracking service, or null where none is provided (the widget tests
+/// that mount the whole shell are about navigation, not recording — a real
+/// foreground service cannot run under a test anyway).
+TrackingService? _trackingOf(BuildContext ctx) {
+  try {
+    return ctx.read<TrackingService>();
+  } on ProviderNotFoundException {
+    return null;
+  }
+}
 
 /// The signed-in shell. Navigation is the web SIDEBAR (a drawer behind the top
 /// bar's menu button), not a tab bar: with My Payslips the app carries four
@@ -31,7 +43,7 @@ import 'no_employee_screen.dart';
 ///
 /// The feature controllers live here so switching destinations keeps their
 /// state (the clock's last outcome and last fix, the months already paged in,
-/// the payslips already loaded).
+/// the payslips already loaded). Sign out is the drawer's pinned footer.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -57,10 +69,10 @@ class _HomeShellState extends State<HomeShell> {
     final Widget attendance = hasEmployee && canTeam
         ? const AttendanceTab()
         : canTeam
-            ? const TeamAttendanceScreen()
-            : hasEmployee
-                ? const AttendanceScreen()
-                : const NoEmployeeScreen(what: 'attendance record');
+        ? const TeamAttendanceScreen()
+        : hasEmployee
+        ? const AttendanceScreen()
+        : const NoEmployeeScreen(what: 'attendance record');
     final pages = <Widget>[
       hasEmployee ? const TimeClockScreen() : const NoEmployeeScreen(what: 'time clock'),
       attendance,
@@ -99,6 +111,7 @@ class _HomeShellState extends State<HomeShell> {
           create: (ctx) => TimeClockController(
             api: ctx.read<ClockApi?>() ?? MobileClockApi(ctx.read<SessionController>()),
             fixes: ctx.read<LocationFixService>(),
+            tracking: _trackingOf(ctx),
           ),
         ),
         ChangeNotifierProvider<AttendanceController>(
@@ -113,9 +126,8 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ),
         ChangeNotifierProvider<PayslipsController>(
-          create: (ctx) => PayslipsController(
-            api: ctx.read<PayslipApi?>() ?? MobilePayslipApi(ctx.read<SessionController>()),
-          ),
+          create: (ctx) =>
+              PayslipsController(api: ctx.read<PayslipApi?>() ?? MobilePayslipApi(ctx.read<SessionController>())),
         ),
       ],
       // The web shell: the brand top bar with the menu button and the account
@@ -137,12 +149,16 @@ class _HomeShellState extends State<HomeShell> {
           onSelect: (i) => setState(() => _index = i),
           username: user?.username ?? '',
           roleName: user?.roleName,
+          // The drawer closes first; the confirmation then opens over the page.
+          onSignOut: () => confirmSignOut(context),
         ),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             PageHeader(titles[_index]),
-            Expanded(child: IndexedStack(index: _index, children: pages)),
+            Expanded(
+              child: IndexedStack(index: _index, children: pages),
+            ),
           ],
         ),
       ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/http/api_exception.dart';
@@ -5,6 +7,8 @@ import '../../core/location/location_fix.dart';
 import '../../core/time/server_clock.dart';
 import '../face/face_capture_screen.dart';
 import '../face/face_models.dart';
+import '../tracking/tracking_models.dart';
+import '../tracking/tracking_service.dart';
 import 'clock_api.dart';
 import 'clock_models.dart';
 
@@ -56,6 +60,10 @@ class TimeClockController extends ChangeNotifier {
   final LocationFixService fixes;
   final ServerClock clock;
 
+  /// Work-hours location tracking. Null where there is no service to drive (a
+  /// widget test that is not about tracking).
+  final TrackingService? tracking;
+
   bool _loading = false;
   String? _loadError;
   ClockStatus? _status;
@@ -66,7 +74,8 @@ class TimeClockController extends ChangeNotifier {
   bool _consentSaving = false;
   bool _disposed = false;
 
-  TimeClockController({required this.api, required this.fixes, ServerClock? clock}) : clock = clock ?? ServerClock();
+  TimeClockController({required this.api, required this.fixes, ServerClock? clock, this.tracking})
+      : clock = clock ?? ServerClock();
 
   bool get loading => _loading;
   String? get loadError => _loadError;
@@ -101,12 +110,24 @@ class TimeClockController extends ChangeNotifier {
       _status = s;
       clock.sync(s.serverTime);
       _loadError = null;
+      _syncTracking(s.tracking);
     } on ApiException catch (e) {
       _loadError = e.message;
     } finally {
       _loading = false;
       _notify();
     }
+  }
+
+  /// Make the phone match the server after every status load — which follows
+  /// every punch. So a clock-in starts recording, a clock-out stops it, and a
+  /// cold start mid-shift (a reboot, a reinstall, a kill) picks it back up.
+  /// Deliberately not awaited: stopping waits for the service's last upload,
+  /// and the screen must not hang on that.
+  void _syncTracking(TrackingState state) {
+    final t = tracking;
+    if (t == null) return;
+    unawaited(t.sync(state));
   }
 
   /// The pre-punch "am I in range?" reading. Never sent anywhere.

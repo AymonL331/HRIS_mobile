@@ -12,13 +12,28 @@
          `whileInUse`. See the loud comment in core/location/location_gate_service
          .dart; the background ask goes through permission_handler instead.
 
-         NOT declared here: FOREGROUND_SERVICE / FOREGROUND_SERVICE_LOCATION. This
-         change is the permission groundwork only — holding background location
-         does not itself collect anything while the app is closed, and declaring a
-         service permission nothing uses would be dead weight. -->
+         WORK-HOURS TRACKING (2026-09-14) is what collects: a foreground service of
+         type `location` (declared below, with its permissions) records the trail
+         from clock-in to clock-out behind a visible notification. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+    <!-- The setup wizard's two optional steps (2026-09-14). POST_NOTIFICATIONS:
+         Android 13+ shows no notification dialog unless it is declared.
+         REQUEST_IGNORE_BATTERY_OPTIMIZATIONS: the "Let app always run in
+         background?" dialog — without the exemption most phones sold here stop a
+         background app within minutes, which would end work-hours tracking. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <!-- The work-hours tracking service (flutter_foreground_task). Android 14+
+         refuses to start a foreground service without its TYPE permission;
+         RECEIVE_BOOT_COMPLETED lets a shift that was open when the phone
+         restarted resume recording (location FGS may start from boot, unlike
+         dataSync on Android 15). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <!-- The face check that gates every punch (2026-09-13). Requested at the
          moment of the first capture, never at launch. `required="false"` on the
          feature so the app still installs on a device with no front camera —
@@ -53,6 +68,15 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- The work-hours location tracking service. The name is the plugin's
+             and must not change. stopWithTask false: swiping HRIS out of recents
+             must NOT end recording mid-shift — only clock-out (or the server
+             saying the shift closed) does. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="location"
+            android:stopWithTask="false"
+            android:exported="false" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

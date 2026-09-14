@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
@@ -6,11 +9,13 @@ import 'app.dart';
 import 'core/auth/session_controller.dart';
 import 'core/auth/session_store.dart';
 import 'core/config/env_store.dart';
+import 'core/device/device_readiness_service.dart';
 import 'core/location/location_fix.dart';
 import 'core/location/location_gate_service.dart';
 import 'features/attendance/attendance_api.dart';
 import 'features/payslips/payslip_api.dart';
 import 'features/time_clock/clock_api.dart';
+import 'features/tracking/tracking_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +33,17 @@ Future<void> main() async {
 
   final session = SessionController(env: envStore, store: SecureSessionStore(), appVersion: version);
 
+  // Work-hours location tracking: the port the service talks back on, then the
+  // UI-side driver. A REAL sign-out (token gone) or an environment switch ends
+  // recording; an offline cold start that merely shows the login screen does not.
+  FlutterForegroundTask.initCommunicationPort();
+  final tracking = ForegroundTrackingService(session);
+  session.addListener(() {
+    if (session.state is SignedOut && !session.hasStoredSession) {
+      unawaited(tracking.stop(reason: 'signed_out'));
+    }
+  });
+
   runApp(
     MultiProvider(
       providers: [
@@ -37,6 +53,9 @@ Future<void> main() async {
         // because `checkPermission()` cannot report `deniedForever` and a passive
         // re-check would otherwise downgrade it back to a dead "Try again".
         Provider<LocationGateService>.value(value: GeolocatorGateService()),
+        // Notifications + battery exemption, the setup wizard's optional steps.
+        Provider<DeviceReadinessService>.value(value: PlatformReadinessService()),
+        Provider<TrackingService>.value(value: tracking),
         Provider<LocationFixService>.value(value: const GeolocatorFixService()),
         // The Time Clock's API is built from the session by the shell; tests
         // inject a fake here instead.

@@ -43,9 +43,12 @@ class ConsentScreen extends StatelessWidget {
             Text(
               'To use this app you must allow HRIS to access your location ALL THE TIME and with PRECISE '
               'accuracy. That means the app is able to read where you are even when it is closed.\n\n'
-              'Today your position is recorded when you clock in and out, so your attendance can be checked '
-              'against your branch worksite. Your employer may extend this to recording your location while '
-              'you are on duty. Either way it is stored securely and never shared beyond your employer.',
+              'While you are clocked in — from the moment you clock in until you clock out — the app records '
+              'where you are every few minutes, even with the screen off, and shows a notification while it '
+              'does. Your clock-in and clock-out positions are also checked against your branch worksite. '
+              'Outside your working hours nothing is recorded.\n\n'
+              'HR can view the route you took during your shift. The records are kept for 90 days, stored '
+              'securely and never shared beyond your employer.',
               style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.text),
             ),
             const SizedBox(height: HrisSpace.s3),
@@ -56,9 +59,9 @@ class ConsentScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(HrisRadius.sm),
               ),
               child: Text(
-                'By continuing you consent to your employer recording your geolocation, including while this '
-                'app is not open (Data Privacy Act of 2012, RA 10173). To withdraw it, ask HR — withdrawing '
-                'means you can no longer clock in or out from this app.',
+                'By continuing you consent to your employer recording your geolocation during your working '
+                'hours, including while this app is not open (Data Privacy Act of 2012, RA 10173). To withdraw '
+                'it, ask HR — withdrawing means you can no longer clock in or out from this app.',
                 style: TextStyle(fontSize: HrisType.xs, height: 1.45, color: t.muted),
               ),
             ),

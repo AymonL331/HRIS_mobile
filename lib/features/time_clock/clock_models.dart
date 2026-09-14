@@ -1,5 +1,6 @@
 import '../../core/location/geo.dart';
 import '../../core/time/manila_time.dart';
+import '../tracking/tracking_models.dart';
 
 int? _int(Object? v) => v == null ? null : (v is int ? v : int.tryParse('$v'));
 double? _num(Object? v) => v == null ? null : (v is num ? v.toDouble() : double.tryParse('$v'));
@@ -123,6 +124,9 @@ class ClockStatus {
   final bool consentGiven;
   final FaceGate face;
 
+  /// Whether the phone should be recording the work-hours trail right now.
+  final TrackingState tracking;
+
   const ClockStatus({
     required this.serverTime,
     required this.timezone,
@@ -134,6 +138,7 @@ class ClockStatus {
     required this.worksite,
     required this.consentGiven,
     required this.face,
+    this.tracking = TrackingState.inactive,
   });
 
   bool get canClockIn => today == null || today!.clockInAt == null;
@@ -160,6 +165,7 @@ class ClockStatus {
       worksite: Worksite.fromJson(j['worksite'] as Map<String, dynamic>?),
       consentGiven: _flag(consent['consent_given']),
       face: FaceGate.fromJson(j['face'] as Map<String, dynamic>?),
+      tracking: TrackingState.fromJson(j['tracking'] as Map<String, dynamic>?),
     );
   }
 }

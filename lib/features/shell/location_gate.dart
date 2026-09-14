@@ -2,21 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/session_controller.dart';
+import '../../core/device/device_readiness_service.dart';
 import '../../core/location/location_gate_service.dart';
-import '../../shared/tokens.dart';
-import '../../shared/widgets/app_card.dart';
+import '../setup/setup_step.dart';
+import '../setup/setup_wizard_screen.dart';
 
-/// Wraps everything a signed-in user can see. Unless location is granted
-/// "Allow all the time" with PRECISE accuracy, and the device's location service
-/// is on, the child is NOT built — a full-screen explanation stands in its place
-/// with the buttons that fix it. Re-checks when the app returns to the
-/// foreground (the user coming back from Settings), on mount, and on Retry, so
-/// the block clears itself the moment the phone is set up right.
+/// Wraps everything a signed-in user can see. Until the phone is set up —
+/// location on, "Allow all the time", precise, and (unless deliberately
+/// skipped) notifications and the battery exemption — the child is NOT built;
+/// the setup wizard stands in its place, one step at a time.
 ///
-/// Only the MOUNT and the RETRY may raise a permission dialog. The resume
-/// re-check is deliberately passive: returning from Settings is itself a resume,
-/// so a prompting resume-check would throw the user straight back out to
-/// Settings in a loop.
+/// NOTHING HERE PROMPTS ON ITS OWN (2026-09-14). The mount and every resume only
+/// OBSERVE. A system dialog or Settings page appears only when the employee taps
+/// the button under the explanation of what is about to appear. That is the fix
+/// for the confusing first launch, and it also rules out the Settings loop:
+/// returning from Settings is itself a resume, and a resume never prompts.
 class LocationGate extends StatefulWidget {
   final Widget child;
 
@@ -28,14 +28,23 @@ class LocationGate extends StatefulWidget {
 
 class _LocationGateState extends State<LocationGate> with WidgetsBindingObserver {
   GateVerdict? _verdict; // null = first check in flight
-  bool _checking = false;
+  DeviceReadiness _device = DeviceReadiness.ready;
+  Set<String> _skipped = const {};
+  bool _refusedOnce = false;
+
+  /// An earlier step the employee went Back to, to re-read. Null = showing the
+  /// step the phone is actually on. Cleared whenever that real step changes.
+  SetupStep? _reviewing;
+  SetupStep? _currentStep;
+
+  bool _refreshing = false;
+  bool _refreshAgain = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // The user just arrived — this one may ask.
-    _check(interactive: true);
+    _refresh();
   }
 
   @override
@@ -46,126 +55,98 @@ class _LocationGateState extends State<LocationGate> with WidgetsBindingObserver
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // PASSIVE on purpose — see the class docblock. Observe, never prompt.
-    if (state == AppLifecycleState.resumed) _check();
+    if (state == AppLifecycleState.resumed) _refresh();
   }
 
-  Future<void> _check({bool interactive = false}) async {
-    if (_checking) return;
-    _checking = true;
-    try {
-      final v = await context.read<LocationGateService>().check(interactive: interactive);
-      if (mounted) setState(() => _verdict = v);
-    } finally {
-      _checking = false;
+  /// Re-reads everything. A refresh asked for while one is in flight is not
+  /// dropped — it runs again afterwards, so the result of an action that
+  /// finished mid-check is never lost to a stale answer.
+  Future<void> _refresh() async {
+    if (_refreshing) {
+      _refreshAgain = true;
+      return;
     }
+    _refreshing = true;
+    final gate = context.read<LocationGateService>();
+    final readiness = context.read<DeviceReadinessService>();
+    try {
+      do {
+        _refreshAgain = false;
+        final verdict = await gate.check();
+        final device = await readiness.check();
+        final skipped = await readiness.skippedSteps();
+        if (!mounted) return;
+        setState(() {
+          _verdict = verdict;
+          _device = device;
+          _skipped = skipped;
+          if (verdict != GateVerdict.permissionDenied) _refusedOnce = false;
+          final step = nextSetupStep(location: verdict, device: device, skipped: skipped);
+          if (step != _currentStep) {
+            // Real progress (or a regression) ends any review in progress.
+            _currentStep = step;
+            _reviewing = null;
+          }
+        });
+      } while (_refreshAgain);
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  /// A deliberate user action, then a fresh look. Every request underneath is
+  /// already timed out; a throw must still never strand the screen.
+  Future<void> _act(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (_) {}
+    if (mounted) await _refresh();
   }
 
   @override
   Widget build(BuildContext context) {
-    final v = _verdict;
-    if (v == null) {
+    final verdict = _verdict;
+    if (verdict == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    if (v.blocks) {
-      // The retry buttons are a deliberate user action, so they may ask.
-      return LocationBlockedScreen(verdict: v, onRetry: () => _check(interactive: true));
-    }
-    return widget.child;
-  }
-}
+    final step = nextSetupStep(location: verdict, device: _device, skipped: _skipped);
+    if (step == null) return widget.child;
 
-class LocationBlockedScreen extends StatelessWidget {
-  final GateVerdict verdict;
-  final Future<void> Function() onRetry;
+    final gate = context.read<LocationGateService>();
+    final readiness = context.read<DeviceReadinessService>();
 
-  const LocationBlockedScreen({super.key, required this.verdict, required this.onRetry});
+    // Back never undoes anything — the step is decided by what the phone has
+    // granted. It shows an earlier step again to re-read; Next walks forward.
+    final review = _reviewing;
+    final shown = review != null && review.index < step.index ? review : step;
+    final reviewing = shown != step;
+    final previous = shown.index > 0 ? SetupStep.values[shown.index - 1] : null;
 
-  @override
-  Widget build(BuildContext context) {
-    final service = context.read<LocationGateService>();
-    final scheme = Theme.of(context).colorScheme;
-    final (icon, title, body, primaryLabel, primaryAction) = switch (verdict) {
-      GateVerdict.serviceOff => (
-          Icons.location_off_outlined,
-          'Turn on location',
-          "This app records where you clock in and out, so it can't run while your phone's location is off.",
-          'Open location settings',
-          service.openLocationSettings,
-        ),
-      GateVerdict.permissionDenied => (
-          Icons.location_disabled_outlined,
-          'Allow location access',
-          'HRIS cannot run without your location. Tap Try again and choose "Precise". Android will then ask a second time — HRIS needs "Allow all the time", not only while the app is open.',
-          'Try again',
-          onRetry,
-        ),
-      GateVerdict.permissionDeniedForever => (
-          Icons.location_disabled_outlined,
-          'Location access is blocked',
-          'Location for HRIS is turned off in your phone settings. Open the app settings, tap Permissions › Location, choose "Allow all the time", and turn on "Use precise location".',
-          'Open app settings',
-          service.openAppSettings,
-        ),
-      // Foreground-only. Both switches live on the same Settings page, so this
-      // names both and the employee makes ONE trip.
-      GateVerdict.backgroundDenied => (
-          Icons.my_location,
-          'Set location to "Allow all the time"',
-          'HRIS needs your location all the time, not only while the app is open. Open the app settings, tap Permissions › Location, choose "Allow all the time", and make sure "Use precise location" is on.',
-          'Open app settings',
-          service.openAppSettings,
-        ),
-      GateVerdict.reducedAccuracy => (
-          Icons.gps_not_fixed,
-          'Precise location is required',
-          'Location is set to "Approximate", which is only good to a few kilometres and cannot show you were at your branch. In the app settings, under Permissions › Location, turn on "Use precise location".',
-          'Open app settings',
-          service.openAppSettings,
-        ),
-      GateVerdict.ok => (Icons.check, '', '', '', onRetry),
-    };
-
-    // The web's full-page block: one card on the page background, a danger
-    // icon, the reason, the way out.
-    final t = HrisTokens.of(context);
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(HrisSpace.s5),
-            child: AppCard(
-              maxWidth: 420,
-              padding: const EdgeInsets.all(HrisSpace.s6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(icon, size: 56, color: scheme.error),
-                  const SizedBox(height: HrisSpace.s4),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: HrisType.heading, fontWeight: HrisType.semibold, height: 1.25, color: t.text),
-                  ),
-                  const SizedBox(height: HrisSpace.s3),
-                  Text(body, textAlign: TextAlign.center, style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted)),
-                  const SizedBox(height: HrisSpace.s5),
-                  FilledButton(onPressed: () => primaryAction(), child: Text(primaryLabel)),
-                  const SizedBox(height: HrisSpace.s3),
-                  if (verdict != GateVerdict.permissionDenied)
-                    OutlinedButton(onPressed: () => onRetry(), child: const Text('Check again')),
-                  const SizedBox(height: HrisSpace.s4),
-                  TextButton(
-                    onPressed: () => context.read<SessionController>().logout(),
-                    child: const Text('Sign out'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    return SetupWizardScreen(
+      step: shown,
+      reviewing: reviewing,
+      onBack: previous == null ? null : () => setState(() => _reviewing = previous),
+      onForward: reviewing
+          ? () => setState(() {
+                final next = SetupStep.values[shown.index + 1];
+                _reviewing = next.index >= step.index ? null : next;
+              })
+          : null,
+      verdict: verdict,
+      device: _device,
+      refusedOnce: _refusedOnce,
+      onOpenLocationSettings: () => _act(gate.openLocationSettings),
+      onRequestForeground: () => _act(() async {
+        final after = await gate.requestForeground();
+        _refusedOnce = after == GateVerdict.permissionDenied;
+      }),
+      onRequestBackground: () => _act(gate.requestBackground),
+      onRequestNotifications: () => _act(readiness.requestNotifications),
+      onRequestBattery: () => _act(readiness.requestBatteryExemption),
+      onOpenAppSettings: () => _act(readiness.openAppSettings),
+      onCheckAgain: _refresh,
+      onSkip: () => _act(() => readiness.skipStep(step.name)),
+      onSignOut: () => context.read<SessionController>().logout(),
     );
   }
 }

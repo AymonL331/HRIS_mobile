@@ -7,6 +7,7 @@ import 'package:hris_mobile/core/auth/session_controller.dart';
 import 'package:hris_mobile/core/auth/session_store.dart';
 import 'package:hris_mobile/core/config/env_store.dart';
 import 'package:hris_mobile/core/location/location_fix.dart';
+import 'package:hris_mobile/core/device/device_readiness_service.dart';
 import 'package:hris_mobile/core/location/location_gate_service.dart';
 import 'package:hris_mobile/features/auth/env_settings_sheet.dart';
 import 'package:hris_mobile/features/time_clock/clock_api.dart';
@@ -44,6 +45,7 @@ Future<({SessionController session, EnvStore env, List<http.Request> seen})> boo
       ChangeNotifierProvider<EnvStore>.value(value: envStore),
       ChangeNotifierProvider<SessionController>.value(value: session),
       Provider<LocationGateService>.value(value: AlwaysOkGate()),
+      Provider<DeviceReadinessService>.value(value: AlwaysReadyDevice()),
       Provider<LocationFixService>.value(value: FakeFixService()),
       Provider<ClockApi?>.value(value: FakeClockApi()),
     ],
