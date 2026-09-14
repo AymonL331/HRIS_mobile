@@ -13,7 +13,15 @@ abstract final class Endpoints {
   /// action sequence; what differs is which endpoint consumes it), so the app
   /// reuses the existing route rather than asking for a second one.
   static const faceChallenge = '/api/me/face-clock/challenge';
+  /// The WEB field clock's consent. The app no longer writes this — kept only
+  /// because the constant documents the pair below it.
   static const locationConsent = '/api/me/location-consent';
+
+  /// The MOBILE APP's own RA 10173 consent (migration 059). A separate record
+  /// from the one above because the app demands always-on PRECISE location,
+  /// which is a wider collection than the punch-time geotag the web consent
+  /// describes. Mobile-token only; a web session gets 403 MOBILE_ONLY.
+  static const mobileLocationConsent = '/api/me/mobile-location-consent';
   static const attendanceCalendar = '/api/me/attendance/calendar';
 
   /// My payslips. Ownership-scoped on the server (`resolveSelf` forces the

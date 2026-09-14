@@ -141,7 +141,13 @@ class ClockStatus {
 
   factory ClockStatus.fromJson(Map<String, dynamic> j) {
     final emp = (j['employee'] as Map<String, dynamic>?) ?? const {};
-    final consent = (j['consent'] as Map<String, dynamic>?) ?? const {};
+    // The MOBILE consent (migration 059) is what gates this app. The `consent`
+    // block is the WEB field clock's and is echoed read-only. Falling back to it
+    // keeps a build pointed at a pre-059 server working rather than locking
+    // everyone out of an app whose consent endpoint does not exist yet.
+    final consent = (j['mobile_consent'] as Map<String, dynamic>?) ??
+        (j['consent'] as Map<String, dynamic>?) ??
+        const {};
     final today = j['today'];
     return ClockStatus(
       serverTime: ManilaTime.parseUtc(j['server_time'] as String?) ?? DateTime.now().toUtc(),

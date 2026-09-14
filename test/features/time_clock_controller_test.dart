@@ -91,7 +91,7 @@ void main() {
   });
 
   test('consent: status without consent → grantConsent → reloaded with consent', () async {
-    api.status_ = statusJson(consent: false);
+    api.status_ = statusJson(mobileConsent: false);
     await c.load();
     expect(c.status!.consentGiven, isFalse);
     await c.grantConsent();

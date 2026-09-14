@@ -104,14 +104,41 @@ void main() {
   });
 
   testWidgets('no consent on record shows the consent screen first; agreeing unlocks the clock', (tester) async {
-    final api = FakeClockApi()..status_ = statusJson(consent: false);
+    final api = FakeClockApi()..status_ = statusJson(mobileConsent: false);
     await mount(tester, api, FakeFixService());
     expect(find.text('Location consent'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Time In'), findsNothing);
+    // The consent copy is long enough that the button sits below the fold on a
+    // small screen — the card scrolls, so scroll to it the way a person would.
+    await tester.ensureVisible(find.textContaining('I agree'));
+    await tester.pump();
     await tester.tap(find.textContaining('I agree'));
     await settle(tester);
     expect(api.consents, 1);
     expect(find.widgetWithText(FilledButton, 'Time In'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("the WEB consent does NOT unlock the app — only the mobile one does", (tester) async {
+    // The two are separate records (migration 059). Someone who agreed on the
+    // website to a punch-time geotag has not agreed to an app that holds
+    // always-on location, so the app must still ask.
+    final api = FakeClockApi()..status_ = statusJson(consent: true, mobileConsent: false);
+    await mount(tester, api, FakeFixService());
+    expect(find.text('Location consent'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Time In'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('the consent copy discloses the wider, always-on collection', (tester) async {
+    final api = FakeClockApi()..status_ = statusJson(mobileConsent: false);
+    await mount(tester, api, FakeFixService());
+    // It must not still claim location is taken "only at the moment you clock".
+    expect(find.textContaining('ALL THE TIME'), findsOneWidget);
+    expect(find.textContaining('even when it is closed'), findsOneWidget);
+    expect(find.textContaining('only at the moment you clock'), findsNothing);
+    // And it must not promise a website withdrawal route that does not exist.
+    expect(find.textContaining('withdraw this consent from the HRIS website'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 

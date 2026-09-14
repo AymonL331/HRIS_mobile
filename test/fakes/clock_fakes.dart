@@ -5,7 +5,16 @@ import 'package:hris_mobile/features/face/face_models.dart';
 import 'package:hris_mobile/features/time_clock/clock_api.dart';
 import 'package:hris_mobile/features/time_clock/clock_models.dart';
 
-Map<String, dynamic> statusJson({Map<String, dynamic>? today, bool consent = true, bool worksite = true, bool faceEnrolled = true}) => {
+Map<String, dynamic> statusJson({
+  Map<String, dynamic>? today,
+  bool consent = true,
+  bool worksite = true,
+  bool faceEnrolled = true,
+  /// The MOBILE consent (migration 059) — the one that actually gates the app.
+  /// Separate from [consent] so a test can drive the two apart and prove the
+  /// web's flag does not unlock the phone.
+  bool mobileConsent = true,
+}) => {
       'server_time': '2026-09-11T00:12:33.000Z',
       'timezone': 'Asia/Manila',
       'local_date': '2026-09-11',
@@ -16,6 +25,7 @@ Map<String, dynamic> statusJson({Map<String, dynamic>? today, bool consent = tru
           ? {'branch_id': 1, 'branch_name': 'Head Office', 'configured': true, 'lat': 14.5513714, 'lng': 121.0175541, 'radius_m': 200, 'radius_is_default': true, 'enforcement': 'flag'}
           : {'branch_id': 1, 'branch_name': 'Head Office', 'configured': false, 'lat': null, 'lng': null, 'radius_m': null, 'radius_is_default': false, 'enforcement': 'flag'},
       'consent': {'consent_given': consent, 'consent_at': null, 'consent_withdrawn_at': null},
+      'mobile_consent': {'consent_given': mobileConsent, 'consent_at': null, 'consent_withdrawn_at': null},
       'face': {
         'required': true,
         'enrolled': faceEnrolled,
@@ -128,7 +138,7 @@ class FakeFixService implements LocationFixService {
 
 class AlwaysOkGate implements LocationGateService {
   @override
-  Future<GateVerdict> check() async => GateVerdict.ok;
+  Future<GateVerdict> check({bool interactive = false}) async => GateVerdict.ok;
   @override
   Future<void> openAppSettings() async {}
   @override

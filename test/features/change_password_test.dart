@@ -131,7 +131,7 @@ class _StubClock implements ClockApi {
 
 class _AlwaysOk implements LocationGateService {
   @override
-  Future<GateVerdict> check() async => GateVerdict.ok;
+  Future<GateVerdict> check({bool interactive = false}) async => GateVerdict.ok;
   @override
   Future<void> openAppSettings() async {}
   @override

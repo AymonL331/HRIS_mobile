@@ -1,9 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- The app talks to the HRIS API and must know precisely where the phone is
-         before a punch (both location permissions so Android 12+ offers Precise). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Location is MANDATORY, PRECISE and ALWAYS (2026-09-14): the app is blocked
+         unless the employee has granted "Allow all the time" with "Use precise
+         location" on. Fine + coarse are both declared because Android 12+ only
+         offers the Precise toggle when it sees them.
+
+         BACKGROUND IS REQUESTED SEPARATELY, after foreground is already granted.
+         Android 11+ silently ignores a request that mixes foreground and
+         background location — granting neither, with no dialog — and geolocator's
+         own requestPermission() will bundle them the moment the current status is
+         `whileInUse`. See the loud comment in core/location/location_gate_service
+         .dart; the background ask goes through permission_handler instead.
+
+         NOT declared here: FOREGROUND_SERVICE / FOREGROUND_SERVICE_LOCATION. This
+         change is the permission groundwork only — holding background location
+         does not itself collect anything while the app is closed, and declaring a
+         service permission nothing uses would be dead weight. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
     <!-- The face check that gates every punch (2026-09-13). Requested at the
          moment of the first capture, never at launch. `required="false"` on the
          feature so the app still installs on a device with no front camera —

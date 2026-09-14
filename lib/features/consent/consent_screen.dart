@@ -3,10 +3,17 @@ import 'package:flutter/material.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
 
-/// RA 10173 (Data Privacy Act of 2012) consent, shown in place of the Time
-/// Clock until it is on record. Nothing is captured before this. The wording
-/// follows the web app's, minus the face check the phone does not do; the
-/// look is the web's consent card (MyTimeClockPage .legal box + a lg button).
+/// RA 10173 (Data Privacy Act of 2012) consent for the MOBILE APP, shown in
+/// place of the Time Clock until it is on record. Nothing is captured before it.
+///
+/// This is NOT the web field clock's consent. That one covers a geotag taken at
+/// the moment of a punch; this app requires Android location "Allow all the
+/// time" with precise accuracy, which is a wider permission, so it is asked for
+/// and recorded separately (migration 059). The copy below therefore has to
+/// describe the wider thing — an employee who agreed to "only when I clock"
+/// has not agreed to an app that can read their position while it is closed.
+///
+/// The look is the web's consent card (MyTimeClockPage .legal box + a lg button).
 class ConsentScreen extends StatelessWidget {
   final bool saving;
   final VoidCallback onAgree;
@@ -34,9 +41,11 @@ class ConsentScreen extends StatelessWidget {
             ),
             const SizedBox(height: HrisSpace.s3),
             Text(
-              'The HRIS time clock records WHERE you clock in and out, so your attendance can be verified '
-              'against your branch worksite. Your location is captured only at the moment you clock, stored '
-              'securely, and never shared beyond your employer.',
+              'To use this app you must allow HRIS to access your location ALL THE TIME and with PRECISE '
+              'accuracy. That means the app is able to read where you are even when it is closed.\n\n'
+              'Today your position is recorded when you clock in and out, so your attendance can be checked '
+              'against your branch worksite. Your employer may extend this to recording your location while '
+              'you are on duty. Either way it is stored securely and never shared beyond your employer.',
               style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.text),
             ),
             const SizedBox(height: HrisSpace.s3),
@@ -47,8 +56,9 @@ class ConsentScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(HrisRadius.sm),
               ),
               child: Text(
-                'By continuing you consent to your employer recording your geolocation on each clock event '
-                '(Data Privacy Act of 2012, RA 10173). You can withdraw this consent from the HRIS website at any time.',
+                'By continuing you consent to your employer recording your geolocation, including while this '
+                'app is not open (Data Privacy Act of 2012, RA 10173). To withdraw it, ask HR — withdrawing '
+                'means you can no longer clock in or out from this app.',
                 style: TextStyle(fontSize: HrisType.xs, height: 1.45, color: t.muted),
               ),
             ),

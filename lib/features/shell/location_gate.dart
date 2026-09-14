@@ -6,11 +6,17 @@ import '../../core/location/location_gate_service.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
 
-/// Wraps everything a signed-in user can see. While the device cannot give a
-/// precise location the child is NOT built — a full-screen explanation stands
-/// in its place, with the buttons that fix it. Re-checks when the app returns
-/// to the foreground (the user comes back from Settings), on mount, and on
-/// Retry — so the block clears itself the moment the phone is set up right.
+/// Wraps everything a signed-in user can see. Unless location is granted
+/// "Allow all the time" with PRECISE accuracy, and the device's location service
+/// is on, the child is NOT built — a full-screen explanation stands in its place
+/// with the buttons that fix it. Re-checks when the app returns to the
+/// foreground (the user coming back from Settings), on mount, and on Retry, so
+/// the block clears itself the moment the phone is set up right.
+///
+/// Only the MOUNT and the RETRY may raise a permission dialog. The resume
+/// re-check is deliberately passive: returning from Settings is itself a resume,
+/// so a prompting resume-check would throw the user straight back out to
+/// Settings in a loop.
 class LocationGate extends StatefulWidget {
   final Widget child;
 
@@ -28,7 +34,8 @@ class _LocationGateState extends State<LocationGate> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _check();
+    // The user just arrived — this one may ask.
+    _check(interactive: true);
   }
 
   @override
@@ -39,14 +46,15 @@ class _LocationGateState extends State<LocationGate> with WidgetsBindingObserver
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // PASSIVE on purpose — see the class docblock. Observe, never prompt.
     if (state == AppLifecycleState.resumed) _check();
   }
 
-  Future<void> _check() async {
+  Future<void> _check({bool interactive = false}) async {
     if (_checking) return;
     _checking = true;
     try {
-      final v = await context.read<LocationGateService>().check();
+      final v = await context.read<LocationGateService>().check(interactive: interactive);
       if (mounted) setState(() => _verdict = v);
     } finally {
       _checking = false;
@@ -60,7 +68,8 @@ class _LocationGateState extends State<LocationGate> with WidgetsBindingObserver
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (v.blocks) {
-      return LocationBlockedScreen(verdict: v, onRetry: _check);
+      // The retry buttons are a deliberate user action, so they may ask.
+      return LocationBlockedScreen(verdict: v, onRetry: () => _check(interactive: true));
     }
     return widget.child;
   }
@@ -87,21 +96,30 @@ class LocationBlockedScreen extends StatelessWidget {
       GateVerdict.permissionDenied => (
           Icons.location_disabled_outlined,
           'Allow location access',
-          'HRIS needs your precise location to record a punch. Allow location for this app, choosing "Precise" and "While using the app".',
+          'HRIS cannot run without your location. Tap Try again and choose "Precise". Android will then ask a second time — HRIS needs "Allow all the time", not only while the app is open.',
           'Try again',
           onRetry,
         ),
       GateVerdict.permissionDeniedForever => (
           Icons.location_disabled_outlined,
           'Location access is blocked',
-          'Location for HRIS is turned off in your phone settings. Open the app settings, tap Permissions › Location, and choose "Allow only while using the app" with "Use precise location" on.',
+          'Location for HRIS is turned off in your phone settings. Open the app settings, tap Permissions › Location, choose "Allow all the time", and turn on "Use precise location".',
+          'Open app settings',
+          service.openAppSettings,
+        ),
+      // Foreground-only. Both switches live on the same Settings page, so this
+      // names both and the employee makes ONE trip.
+      GateVerdict.backgroundDenied => (
+          Icons.my_location,
+          'Set location to "Allow all the time"',
+          'HRIS needs your location all the time, not only while the app is open. Open the app settings, tap Permissions › Location, choose "Allow all the time", and make sure "Use precise location" is on.',
           'Open app settings',
           service.openAppSettings,
         ),
       GateVerdict.reducedAccuracy => (
           Icons.gps_not_fixed,
           'Precise location is required',
-          'Location is set to "Approximate", which is only good to a few kilometres. In the app settings, under Permissions › Location, turn on "Use precise location".',
+          'Location is set to "Approximate", which is only good to a few kilometres and cannot show you were at your branch. In the app settings, under Permissions › Location, turn on "Use precise location".',
           'Open app settings',
           service.openAppSettings,
         ),

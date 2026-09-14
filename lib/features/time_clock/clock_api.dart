@@ -61,6 +61,7 @@ class MobileClockApi implements ClockApi {
             parse: (d) => PunchResponse.fromJson(d as Map<String, dynamic>),
           ));
 
+  // The APP's own consent, not the web field clock's — see Endpoints.
   @override
-  Future<void> grantConsent() => session.guard(() => session.client.post(Endpoints.locationConsent));
+  Future<void> grantConsent() => session.guard(() => session.client.post(Endpoints.mobileLocationConsent));
 }

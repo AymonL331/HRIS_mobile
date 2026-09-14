@@ -33,7 +33,10 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider<EnvStore>.value(value: envStore),
         ChangeNotifierProvider<SessionController>.value(value: session),
-        Provider<LocationGateService>.value(value: const GeolocatorGateService()),
+        // Not const: the gate has to REMEMBER that Android refused to ask again,
+        // because `checkPermission()` cannot report `deniedForever` and a passive
+        // re-check would otherwise downgrade it back to a dead "Try again".
+        Provider<LocationGateService>.value(value: GeolocatorGateService()),
         Provider<LocationFixService>.value(value: const GeolocatorFixService()),
         // The Time Clock's API is built from the session by the shell; tests
         // inject a fake here instead.

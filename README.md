@@ -2,10 +2,12 @@
 
 The employee self-service app for the HRIS. Branch employees sign in with the same
 credentials as the website, clock in / out from their own phone, read their own
-DTR and read their own payslips. **Location is mandatory**: the app does not run
-while the phone's location is off, the permission is missing, or the accuracy is
-set to Approximate, and every punch takes a fresh GPS fix that the server checks
-against the branch worksite. **Face recognition is mandatory too** — see below.
+DTR and read their own payslips. **Location is mandatory, precise and always-on**:
+the app does not run unless the phone's location service is on and HRIS is granted
+"Allow all the time" with "Use precise location" — "While using the app", "Only
+this time" and "Approximate" all block it. Every punch takes a fresh GPS fix that
+the server checks against the branch worksite. **Face recognition is mandatory
+too** — see below.
 
 Only accounts HR has switched on (**Employee profile › Account › Mobile app**)
 can sign in. Turning the switch off signs the phone out on its next request.
@@ -14,7 +16,10 @@ can sign in. Turning the switch off signs the phone out on its next request.
 
 The same Node/Express API as the web app — no direct database access. It uses the
 mobile-only endpoints added by migrations 057/058 (`/api/me/mobile-clock`,
-`/api/me/mobile-clock/status`) plus `/api/auth/*`, `/api/me/location-consent`,
+`/api/me/mobile-clock/status`) plus `/api/auth/*`, `/api/me/mobile-location-consent`
+(the app's OWN RA 10173 consent — migration 059, separate from the web field
+clock's `/api/me/location-consent`, because the app requires always-on precise
+location),
 `/api/me/attendance/calendar`, `/api/me/payslips` (`/:id`, `/:id/breakdown`) and
 `/api/me/face-clock/challenge` (the liveness challenge every punch must answer).
 The server holds every rule; the app never grades attendance and never computes a
@@ -50,6 +55,40 @@ a password chosen on the phone works on the website immediately, and one chosen 
 the website works on the phone. Offering a second, voluntary "change password" on
 the phone would be a weaker door to the same credential, bypassing the handover the
 flow is built around — so the app only points at the real route.
+
+## Location: always + precise
+
+The app refuses to run unless location is granted **"Allow all the time"** with
+**precise** accuracy and the device's location service is on (2026-09-14). The
+decision is one pure function, `decideGate` in
+`lib/core/location/location_gate_service.dart`, so it reads as a truth table:
+only `always` + precise (or `unknown`, which is pre-Android-12) passes.
+Everything else renders a full-screen block naming the exact Settings taps.
+
+Two Android facts shape this, and neither is negotiable:
+
+- **The Precise/Approximate toggle cannot be removed** from the system dialog.
+- **"Allow all the time" can never appear in that first dialog** on Android 11+.
+  Background location is only grantable from the app's Settings page, so the
+  blocked screen — not the permission request — is what actually gets people
+  there.
+
+**A trap for anyone touching this:** now that `ACCESS_BACKGROUND_LOCATION` is in
+the manifest, `Geolocator.requestPermission()` appends it to the same
+`requestPermissions()` call whenever the current status is already
+`whileInUse` — and **Android 11+ silently ignores a request mixing foreground and
+background, granting neither, with no dialog**. So it is only ever called from
+`denied`, and the background ask goes through `permission_handler` alone. Do not
+add a second `Geolocator.requestPermission()` call anywhere.
+
+The gate re-checks on every app resume, but only the **mount** and the **retry
+buttons** may raise a dialog (`check(interactive: true)`). Returning from Settings
+is itself a resume, so a prompting resume-check would bounce the user straight
+back out in a loop.
+
+Holding the permission does **not** by itself collect anything while the app is
+closed — that needs a foreground service with a persistent notification, and is a
+separate feature. This is the groundwork.
 
 ## The face check
 
@@ -179,7 +218,11 @@ flutter build apk --release
 The APK lands in `build/app/outputs/flutter-apk/app-release.apk` (copied to
 `dist/hris-<version>.apk`, gitignored). Hand it to a
 branch with these steps: allow "Install unknown apps" for the browser or file
-manager, install, open, allow Location → **Precise** → **While using the app**.
+manager, install, open, then grant Location as **Precise** → **Allow all the time**.
+Android will not offer "Allow all the time" in the first dialog (it cannot, on
+Android 11+) — the app then shows a screen naming the exact taps: **Permissions ›
+Location › Allow all the time**, with **Use precise location** on. Expect to walk
+the first few employees through that second step.
 Bump `version:` in `pubspec.yaml` before each release (the build number must
 increase for an in-place update).
 
