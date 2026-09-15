@@ -17,6 +17,8 @@ import '../attendance/team_screen.dart';
 import '../payslips/payslip_api.dart';
 import '../payslips/payslips_controller.dart';
 import '../payslips/payslips_screen.dart';
+import '../profile_photo/profile_photo_api.dart';
+import '../profile_photo/profile_photo_screen.dart';
 import '../settings/settings_screen.dart';
 import '../time_clock/clock_api.dart';
 import '../time_clock/time_clock_controller.dart';
@@ -31,6 +33,17 @@ import 'no_employee_screen.dart';
 TrackingService? _trackingOf(BuildContext ctx) {
   try {
     return ctx.read<TrackingService>();
+  } on ProviderNotFoundException {
+    return null;
+  }
+}
+
+/// A profile-photo API injected by a test, or null (the shell then builds the real one
+/// from the session). Tolerates a tree with no such provider at all, like
+/// [_trackingOf], so existing shell tests need no new provider.
+ProfilePhotoApi? _profilePhotoApiOf(BuildContext ctx) {
+  try {
+    return ctx.read<ProfilePhotoApi?>();
   } on ProviderNotFoundException {
     return null;
   }
@@ -65,7 +78,8 @@ class _HomeShellState extends State<HomeShell> {
     final hasEmployee = user?.employeeId != null;
     final canTeam = user?.canViewTeamAttendance ?? false;
     final attendanceTitle = canTeam ? 'Attendance' : 'My Attendance';
-    final titles = ['Time Clock', attendanceTitle, 'My Payslips', 'Settings'];
+    final titles = ['Time Clock', attendanceTitle, 'My Payslips', 'Profile Photo', 'Settings'];
+    final session = context.read<SessionController>();
     final Widget attendance = hasEmployee && canTeam
         ? const AttendanceTab()
         : canTeam
@@ -77,6 +91,14 @@ class _HomeShellState extends State<HomeShell> {
       hasEmployee ? const TimeClockScreen() : const NoEmployeeScreen(what: 'time clock'),
       attendance,
       hasEmployee ? const PayslipsScreen() : const NoEmployeeScreen(what: 'payslip'),
+      // Server migration 062: a new photo waits for HR before it replaces this one.
+      hasEmployee
+          ? ProfilePhotoScreen(
+              api: _profilePhotoApiOf(context) ?? MobileProfilePhotoApi(session),
+              baseUrl: session.env.baseUrl,
+              canSend: user?.canSendProfilePhoto ?? false,
+            )
+          : const NoEmployeeScreen(what: 'profile photo'),
       const SettingsScreen(),
     ];
     final sections = [
@@ -101,7 +123,13 @@ class _HomeShellState extends State<HomeShell> {
         ),
       ]),
       const NavSection('Account', [
-        NavDestination(index: 3, label: 'Settings', icon: Icons.settings_outlined, selectedIcon: Icons.settings),
+        NavDestination(
+          index: 3,
+          label: 'Profile Photo',
+          icon: Icons.account_circle_outlined,
+          selectedIcon: Icons.account_circle,
+        ),
+        NavDestination(index: 4, label: 'Settings', icon: Icons.settings_outlined, selectedIcon: Icons.settings),
       ]),
     ];
 

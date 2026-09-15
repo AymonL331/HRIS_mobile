@@ -48,6 +48,11 @@ abstract final class Endpoints {
   static String payslip(int id) => '/api/me/payslips/$id';
   static String payslipBreakdown(int id) => '/api/me/payslips/$id/breakdown';
 
+  /// PROFILE PHOTO (server migration 062): my current photo and where the last one I
+  /// sent stands (GET), and a new camera photo for HR to approve (POST — needs the
+  /// `profile_photo:create` grant). Mobile-token only.
+  static const profilePhoto = '/api/me/profile-photo';
+
   /// The ONE console route a mobile token may read: the team DTR, for a login
   /// that holds attendance:view. GET only; the server refuses everything else
   /// under /api/attendance with MOBILE_SCOPE.
