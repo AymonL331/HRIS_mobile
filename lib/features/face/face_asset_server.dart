@@ -25,7 +25,7 @@ class FaceAssetServer {
 
   /// The files this server will serve, and nothing else. An allowlist rather
   /// than a path join: a request can never walk out of the asset bundle.
-  static const _allowed = <String>{'capture.html', 'human.js'};
+  static const _allowed = <String>{'capture.html', 'human.js', 'self-test.jpg'};
 
   HttpServer? _server;
   final Map<String, Uint8List> _cache = {};
@@ -65,7 +65,11 @@ class FaceAssetServer {
 
     late final Uint8List bytes;
     try {
-      bytes = _cache[name] ??= (await rootBundle.load('$_root/$name')).buffer.asUint8List();
+      // sublistView, never `.buffer.asUint8List()`: a ByteData can be a VIEW into
+      // a larger buffer, and the whole buffer would be served — shifted weights
+      // that still detect a face but fingerprint it wrongly. (Checked Sep 14: the
+      // emulator's assets were intact either way; this is the documented-safe form.)
+      bytes = _cache[name] ??= Uint8List.sublistView(await rootBundle.load('$_root/$name'));
     } catch (_) {
       request.response.statusCode = HttpStatus.notFound;
       await request.response.close();
@@ -85,6 +89,7 @@ class FaceAssetServer {
     if (name.endsWith('.html')) return ContentType.html;
     if (name.endsWith('.js')) return ContentType('application', 'javascript', charset: 'utf-8');
     if (name.endsWith('.json')) return ContentType.json;
+    if (name.endsWith('.jpg')) return ContentType('image', 'jpeg');
     return ContentType.binary; // the .bin weight shards
   }
 

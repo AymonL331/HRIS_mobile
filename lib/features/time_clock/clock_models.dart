@@ -1,5 +1,6 @@
 import '../../core/location/geo.dart';
 import '../../core/time/manila_time.dart';
+import '../face_enrollment/face_enrollment_models.dart';
 import '../tracking/tracking_models.dart';
 
 int? _int(Object? v) => v == null ? null : (v is int ? v : int.tryParse('$v'));
@@ -88,11 +89,16 @@ class FaceGate {
   final String modelVersion;
   final List<String> livenessChallenges;
 
+  /// Enrolling from this phone (server migration 061): HR's one-time pass, a
+  /// submission waiting for review, or the last refusal.
+  final SelfEnrollmentState selfEnrollment;
+
   const FaceGate({
     required this.required,
     required this.enrolled,
     required this.modelVersion,
     required this.livenessChallenges,
+    this.selfEnrollment = SelfEnrollmentState.none,
   });
 
   factory FaceGate.fromJson(Map<String, dynamic>? j) => j == null
@@ -105,6 +111,7 @@ class FaceGate {
           modelVersion: (j['model_version'] ?? '') as String,
           livenessChallenges:
               ((j['liveness_challenges'] as List?) ?? const []).map((e) => '$e').toList(growable: false),
+          selfEnrollment: SelfEnrollmentState.fromJson(j['self_enrollment'] as Map<String, dynamic>?),
         );
 
   /// May this employee punch right now, as far as the face gate is concerned?

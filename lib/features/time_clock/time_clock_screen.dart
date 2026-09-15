@@ -13,6 +13,9 @@ import '../../shared/widgets/status_badge.dart';
 import '../consent/consent_screen.dart';
 import '../face/face_capture_screen.dart';
 import '../face/face_models.dart';
+import '../face_enrollment/face_enrollment_api.dart';
+import '../face_enrollment/face_enrollment_models.dart';
+import '../face_enrollment/face_enrollment_screen.dart';
 import '../tracking/tracking_service.dart';
 import '../tracking/tracking_status_card.dart';
 import 'clock_models.dart';
@@ -28,7 +31,18 @@ class TimeClockScreen extends StatefulWidget {
   @visibleForTesting
   final FaceCapturer? captureOverride;
 
-  const TimeClockScreen({super.key, this.captureOverride});
+  /// Replace the enrollment API and capture (server migration 061) — tests only.
+  @visibleForTesting
+  final FaceEnrollmentApi? enrollmentApiOverride;
+  @visibleForTesting
+  final EnrollmentCapturer? enrollmentCaptureOverride;
+
+  const TimeClockScreen({
+    super.key,
+    this.captureOverride,
+    this.enrollmentApiOverride,
+    this.enrollmentCaptureOverride,
+  });
 
   @override
   State<TimeClockScreen> createState() => _TimeClockScreenState();
@@ -53,6 +67,22 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
     super.dispose();
   }
 
+  // Enroll (or re-enroll) from this phone while HR's pass is open, then reload so
+  // the card reflects "waiting for review".
+  Future<void> _openEnrollment(TimeClockController c) async {
+    final api = widget.enrollmentApiOverride ?? MobileFaceEnrollmentApi(context.read<SessionController>());
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => FaceEnrollmentScreen(
+          api: api,
+          passExpiresAt: c.status?.face.selfEnrollment.passExpiresAt,
+          captureOverride: widget.enrollmentCaptureOverride,
+        ),
+      ),
+    );
+    if (mounted) await c.load(silent: true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.watch<TimeClockController>();
@@ -71,8 +101,13 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
     // punch at all. Said HERE, on the home screen, rather than after they have
     // stood in front of a camera for twenty seconds to be refused.
     if (!status.face.canPunch) {
-      return const _NotEnrolled();
+      return _NotEnrolled(
+        state: status.face.selfEnrollment,
+        onEnroll: () => _openEnrollment(c),
+        onRefresh: () => c.load(silent: true),
+      );
     }
+    final selfEnrollment = status.face.selfEnrollment;
 
     final tenant = context.read<SessionController>().tenant;
     final now = c.clock.nowUtc();
@@ -93,6 +128,12 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
           ],
           _Header(name: status.employeeName, code: status.employeeCode, tenantName: tenant?.name, nowUtc: now),
           const SizedBox(height: HrisSpace.s3),
+          // Already enrolled, but HR opened a pass — typically because the face they
+          // enrolled on the website does not match this phone's camera.
+          if (selfEnrollment.canEnroll || selfEnrollment.phase == SelfEnrollmentPhase.pending) ...[
+            _ReEnrollBanner(state: selfEnrollment, onEnroll: () => _openEnrollment(c)),
+            const SizedBox(height: HrisSpace.s3),
+          ],
           _TodayCard(status: status),
           const SizedBox(height: HrisSpace.s3),
           _WorksiteCard(controller: c),
@@ -480,15 +521,53 @@ class _LoadError extends StatelessWidget {
 }
 
 /// Shown instead of the clock when the signed-in employee has no active face
-/// template. The mobile clock is face-gated (2026-09-13), so there is nothing
-/// they can do from the app — the fix is HR enrolling their face on the website,
-/// and saying that plainly beats a camera that refuses them.
+/// template. The mobile clock is face-gated (2026-09-13), so they cannot punch —
+/// but since migration 061 they may be able to enroll right here: the card follows
+/// the server's self-enrollment state instead of always saying "ask HR".
 class _NotEnrolled extends StatelessWidget {
-  const _NotEnrolled();
+  final SelfEnrollmentState state;
+  final VoidCallback onEnroll;
+  final VoidCallback onRefresh;
+
+  const _NotEnrolled({required this.state, required this.onEnroll, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
+    final (IconData icon, String title, String body) = switch (state.phase) {
+      SelfEnrollmentPhase.passOpen => (
+          Icons.face_outlined,
+          'Enroll your face',
+          'HR has allowed you to enroll your face on this phone'
+              '${state.passExpiresAt != null ? ' until ${ManilaTime.dateTime(state.passExpiresAt!)}' : ''}. '
+              'It takes about a minute. Once HR approves it, this screen becomes your time clock.',
+        ),
+      SelfEnrollmentPhase.pending => (
+          Icons.hourglass_top_outlined,
+          'Waiting for HR review',
+          'You enrolled your face${state.submittedAt != null ? ' on ${ManilaTime.dateTime(state.submittedAt!)}' : ''}. '
+              'HR will compare the photo with your profile; once they approve it, this screen becomes your time clock.',
+        ),
+      SelfEnrollmentPhase.rejected => (
+          Icons.face_retouching_off_outlined,
+          'Face enrollment not approved',
+          '${state.reason != null && state.reason!.isNotEmpty ? 'HR said: ${state.reason}\n\n' : ''}'
+              'Ask HR to allow face enrollment again, then try in good light, facing the camera.',
+        ),
+      SelfEnrollmentPhase.blocked => (
+          Icons.face_retouching_off_outlined,
+          'Face enrollment not accepted',
+          '${state.reason ?? "This face couldn't be accepted for your account."} Ask HR.',
+        ),
+      SelfEnrollmentPhase.none => (
+          Icons.face_retouching_off_outlined,
+          'Face not enrolled yet',
+          'Clocking in and out from the app is verified by face recognition, and your face has not been '
+              'enrolled yet. Ask HR to enrol you or to allow face enrollment on your phone — then this screen '
+              'becomes your time clock.',
+        ),
+    };
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(HrisSpace.s4),
@@ -499,24 +578,72 @@ class _NotEnrolled extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.face_retouching_off_outlined, size: 40, color: t.muted),
+              Icon(icon, size: 40, color: state.canEnroll ? t.primary : t.muted),
               const SizedBox(height: HrisSpace.s3),
               Text(
-                'Face not enrolled yet',
+                title,
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
               ),
               const SizedBox(height: HrisSpace.s2),
               Text(
-                'Clocking in and out from the app is verified by face recognition, and your face has not been '
-                'enrolled yet. Ask HR to enrol you — it takes a minute at the office — and this screen becomes '
-                'your time clock.',
+                body,
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
               ),
+              if (state.canEnroll) ...[
+                const SizedBox(height: HrisSpace.s5),
+                FilledButton(
+                  onPressed: onEnroll,
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                  child: const Text('Enroll my face'),
+                ),
+              ],
+              if (state.phase == SelfEnrollmentPhase.pending) ...[
+                const SizedBox(height: HrisSpace.s4),
+                OutlinedButton(onPressed: onRefresh, child: const Text('Check again')),
+              ],
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// On the clock itself, for an employee who IS enrolled: HR opened a pass to
+/// re-enroll on this phone, or the new enrollment is waiting for review.
+class _ReEnrollBanner extends StatelessWidget {
+  final SelfEnrollmentState state;
+  final VoidCallback onEnroll;
+
+  const _ReEnrollBanner({required this.state, required this.onEnroll});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = HrisTokens.of(context);
+    final pending = state.phase == SelfEnrollmentPhase.pending;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            pending ? 'New face enrollment waiting for HR review' : 'HR allowed you to re-enroll your face',
+            style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, color: t.text),
+          ),
+          const SizedBox(height: HrisSpace.s1),
+          Text(
+            pending
+                ? 'Keep clocking as usual; your new face takes over once HR approves it.'
+                : 'Do this if the app has trouble recognising you on this phone'
+                    '${state.passExpiresAt != null ? ' (until ${ManilaTime.dateTime(state.passExpiresAt!)})' : ''}.',
+            style: TextStyle(fontSize: HrisType.sm, height: 1.45, color: t.muted),
+          ),
+          if (!pending) ...[
+            const SizedBox(height: HrisSpace.s3),
+            OutlinedButton(onPressed: onEnroll, child: const Text('Re-enroll on this phone')),
+          ],
+        ],
       ),
     );
   }

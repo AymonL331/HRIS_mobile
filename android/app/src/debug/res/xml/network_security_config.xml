@@ -3,11 +3,21 @@
   DEBUG builds only (this file shadows main/res/xml in the debug source set):
   additionally allows the Android emulator's alias for the host PC (10.0.2.2),
   so `flutter run` on the emulator can reach a server on localhost.
+
+  Because it SHADOWS the main file, it must repeat everything main allows —
+  including loopback. Until Sep 14 it did not, so in every debug build the
+  face-capture page (served from the in-app http://127.0.0.1 server) was
+  silently refused and never loaded: no message, no console line, just a
+  spinner. Release builds were never affected.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">192.168.137.1</domain>
         <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
     </domain-config>
 </network-security-config>

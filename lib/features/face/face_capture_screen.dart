@@ -52,8 +52,15 @@ typedef ChallengeIssuer = Future<FaceChallenge> Function(String direction);
 /// that way the whole nonce lifetime is available for the liveness run instead
 /// of being spent on a progress bar.
 class FaceCaptureScreen extends StatefulWidget {
-  final String direction; // 'in' | 'out'
+  final String direction; // 'in' | 'out' ('enroll' for a self-enrollment)
   final ChallengeIssuer issueChallenge;
+
+  /// App-bar title; defaults to "Face check · Time In/Out".
+  final String? title;
+
+  /// Self-enrollment (server migration 061): the page also returns the JPEG of the
+  /// exact frame the embedding came from, and waits for a frontal face to take it.
+  final bool includeFrame;
 
   /// Injected by the widget tests, which cannot run a WebView.
   @visibleForTesting
@@ -63,6 +70,8 @@ class FaceCaptureScreen extends StatefulWidget {
     super.key,
     required this.direction,
     required this.issueChallenge,
+    this.title,
+    this.includeFrame = false,
     this.debugRunner,
   });
 
@@ -177,10 +186,14 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
 
     switch (msg['type']) {
       case 'status':
-        // 'loaded' = the page's script is alive; NOW ask for the challenge, so
-        // the nonce is not spent waiting for 13 MB of weights.
+        // 'loaded' = the page's script is alive: bring up the engine and the
+        // camera. 'prepared' = both are up: only NOW ask for the challenge, so
+        // the nonce is not spent waiting for 13 MB of weights. (Until Sep 14 the
+        // challenge was requested on 'loaded', before the weights, and slow
+        // phones expired mid-punch.)
         _pageWatchdog?.cancel();
-        if (msg['state'] == 'loaded') await _issueAndStart();
+        if (msg['state'] == 'loaded') await _web?.runJavaScript('window.hrisPrepare()');
+        if (msg['state'] == 'prepared') await _issueAndStart();
         // The page reports each stage it reaches, so the employee sees progress
         // instead of one unchanging line while 13 MB of weights load.
         if (msg['state'] == 'stage' && mounted) {
@@ -217,10 +230,12 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
     }
     _challenge = challenge;
     if (!mounted) return;
-    setState(() => _stage = 'Starting the camera…');
+    setState(() => _stage = 'Get ready…');
     // The server's ORDER, passed through untouched — the backend verifies the
     // response against the sequence it issued.
-    await _web?.runJavaScript('window.hrisStart(${jsonEncode(challenge.actions)})');
+    await _web?.runJavaScript(
+      'window.hrisStart(${jsonEncode(challenge.actions)}, ${jsonEncode({'includeFrame': widget.includeFrame})})',
+    );
   }
 
   void _onCaptured(Map<String, dynamic> msg) {
@@ -231,8 +246,10 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
       dims: (msg['dims'] as num?)?.toInt() ?? raw.length,
       modelVersion: (msg['modelVersion'] ?? 'human-3') as String,
       completedChallenges: ((msg['completed'] as List?) ?? const []).map((e) => '$e').toList(growable: false),
+      photoJpegBase64: msg['photo'] as String?,
     );
-    if (!capture.isUsable || capture.nonce.isEmpty) {
+    // An enrollment without its photo cannot be reviewed, so it is not usable.
+    if (!capture.isUsable || capture.nonce.isEmpty || (widget.includeFrame && !capture.hasPhoto)) {
       _showFailure(FaceFailure.noEmbedding);
       return;
     }
@@ -265,7 +282,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFF0F172A),
         appBar: AppBar(
-          title: Text('Face check · $label'),
+          title: Text(widget.title ?? 'Face check · $label'),
           leading: IconButton(
             icon: const Icon(Icons.close),
             onPressed: () => _finish(const FaceFailed(FaceFailure.cancelled)),

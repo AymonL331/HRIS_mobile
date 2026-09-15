@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hris_mobile/core/auth/session_controller.dart';
 import 'package:hris_mobile/core/auth/session_store.dart';
@@ -302,6 +303,23 @@ void main() {
       // weights rather than anything remote.
       expect(body, contains('hrisStart'));
       expect(body, contains("modelBasePath: 'models'"));
+      client.close();
+    });
+
+    test('serves each file byte-for-byte — the weights and the self-test face', () async {
+      // Guards the Sep 14 bug class: a ByteData from rootBundle can be a VIEW into
+      // a larger buffer, and `.buffer.asUint8List()` serves the whole buffer —
+      // shifted weights that still detect a face but fingerprint it wrongly.
+      final base = await server.start();
+      final client = HttpClient();
+      for (final name in ['models/faceres.bin', 'models/blazeface.json', 'self-test.jpg']) {
+        final expected = (await rootBundle.load('assets/face/$name'));
+        final res = await (await client.getUrl(Uri.parse('$base/$name'))).close();
+        expect(res.statusCode, 200, reason: name);
+        final bytes = await res.fold<List<int>>(<int>[], (acc, chunk) => acc..addAll(chunk));
+        expect(bytes.length, expected.lengthInBytes, reason: '$name length');
+        expect(bytes, Uint8List.sublistView(expected), reason: '$name bytes');
+      }
       client.close();
     });
 

@@ -32,13 +32,38 @@ class FaceCapture {
   final String modelVersion;
   final List<String> completedChallenges;
 
+  /// ENROLLMENT ONLY (server migration 061): base64 JPEG of the exact frame the
+  /// embedding was computed from, so HR can compare it with the employee before
+  /// approving. Null on a punch. Like the embedding, it is biometric data: never
+  /// logged, never cached on the device, sent only in the enrollment request.
+  final String? photoJpegBase64;
+
   const FaceCapture({
     required this.nonce,
     required this.embedding,
     required this.dims,
     required this.modelVersion,
     required this.completedChallenges,
+    this.photoJpegBase64,
   });
+
+  /// ~512 KB decoded — the server's cap; anything larger is refused on-device.
+  static const maxPhotoBase64Length = 700000;
+
+  bool get hasPhoto =>
+      photoJpegBase64 != null && photoJpegBase64!.isNotEmpty && photoJpegBase64!.length <= maxPhotoBase64Length;
+
+  /// The body of `POST /api/me/face-enrollment`: the same challenge answer as a
+  /// punch, plus explicit consent and the photo.
+  Map<String, dynamic> toEnrollmentJson() => {
+        'nonce': nonce,
+        'embedding': embedding,
+        'liveness_passed': true,
+        'completed_challenges': completedChallenges,
+        'model_version': modelVersion,
+        'consent_given': true,
+        'photo': {'type': 'image/jpeg', 'data': photoJpegBase64},
+      };
 
   /// The bounds the server enforces (`EMBEDDING_MIN_DIMS`/`MAX_DIMS`), asserted
   /// on-device so a mis-sized capture fails here instead of round-tripping to a
@@ -57,8 +82,8 @@ class FaceCapture {
         'model_version': modelVersion,
       };
 
-  /// Deliberately says nothing about the vector: an embedding is biometric data
-  /// and must never reach a log line or a crash report.
+  /// Deliberately says nothing about the vector or the photo: both are biometric
+  /// data and must never reach a log line or a crash report.
   @override
   String toString() => 'FaceCapture($modelVersion, $dims dims, ${completedChallenges.join("+")})';
 }

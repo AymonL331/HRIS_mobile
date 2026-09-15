@@ -20,6 +20,8 @@ Map<String, dynamic> statusJson({
   bool mobileConsent = true,
   /// The work-hours `tracking` block; omitted (= an older server) when null.
   Map<String, dynamic>? tracking,
+  /// `face.self_enrollment` (server migration 061); omitted when null.
+  Map<String, dynamic>? selfEnrollment,
 }) => {
       'tracking': ?tracking,
       'server_time': '2026-09-11T00:12:33.000Z',
@@ -38,6 +40,7 @@ Map<String, dynamic> statusJson({
         'enrolled': faceEnrolled,
         'model_version': 'human-3',
         'liveness_challenges': ['blink', 'turn_head'],
+        'self_enrollment': ?selfEnrollment,
       },
     };
 

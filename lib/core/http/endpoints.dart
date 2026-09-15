@@ -27,6 +27,12 @@ abstract final class Endpoints {
   /// the tracking service recorded between clock-in and clock-out, including the
   /// ones queued offline. Mobile-token only.
   static const trackingPings = '/api/me/tracking/pings';
+
+  /// FACE SELF-ENROLLMENT (server migration 061): where I stand (HR's one-time
+  /// pass / waiting for review / refused), a liveness challenge issued only while
+  /// the pass is open, and the submission (fingerprint + one JPEG). Mobile-token only.
+  static const faceEnrollment = '/api/me/face-enrollment';
+  static const faceEnrollmentChallenge = '/api/me/face-enrollment/challenge';
   static const attendanceCalendar = '/api/me/attendance/calendar';
 
   /// My payslips. Ownership-scoped on the server (`resolveSelf` forces the
