@@ -12,6 +12,9 @@ import 'core/config/env_store.dart';
 import 'core/device/device_readiness_service.dart';
 import 'core/location/location_fix.dart';
 import 'core/location/location_gate_service.dart';
+import 'features/app_update/app_update_api.dart';
+import 'features/app_update/app_update_controller.dart';
+import 'features/app_update/app_update_models.dart';
 import 'features/attendance/attendance_api.dart';
 import 'features/payslips/payslip_api.dart';
 import 'features/time_clock/clock_api.dart';
@@ -33,6 +36,14 @@ Future<void> main() async {
 
   final session = SessionController(env: envStore, store: SecureSessionStore(), appVersion: version);
 
+  // In-app update (2026-09-15): asks the SELECTED server for a newer published APK.
+  final appUpdate = AppUpdateController(
+    env: envStore,
+    currentVersionCode: versionCodeOf(version),
+    currentVersionName: version.split('+').first,
+    apiFor: (baseUrl) => HttpAppUpdateApi(baseUrl: baseUrl, appVersion: version),
+  );
+
   // Work-hours location tracking: the port the service talks back on, then the
   // UI-side driver. A REAL sign-out (token gone) or an environment switch ends
   // recording; an offline cold start that merely shows the login screen does not.
@@ -49,6 +60,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider<EnvStore>.value(value: envStore),
         ChangeNotifierProvider<SessionController>.value(value: session),
+        ChangeNotifierProvider<AppUpdateController>.value(value: appUpdate),
         // Not const: the gate has to REMEMBER that Android refused to ask again,
         // because `checkPermission()` cannot report `deniedForever` and a passive
         // re-check would otherwise downgrade it back to a dead "Try again".

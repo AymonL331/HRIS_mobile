@@ -5,6 +5,11 @@ abstract final class Endpoints {
   static const me = '/api/auth/me';
   static const changePassword = '/api/auth/change-password';
 
+  /// IN-APP UPDATE (2026-09-15): the newest published APK and the oldest build still
+  /// allowed. PUBLIC — no token — so the check also runs on the login screen. The
+  /// download path comes back in the response.
+  static const appUpdateLatest = '/api/mobile-app/latest';
+
   static const mobileClockStatus = '/api/me/mobile-clock/status';
   static const mobileClock = '/api/me/mobile-clock';
 

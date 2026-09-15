@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  IN-APP UPDATE (2026-09-15): the ONLY folder the app shares with Android's
+  installer — the downloaded update in the app's own cache (cache/updates/).
+  Nothing else on the phone is exposed through this FileProvider.
+-->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

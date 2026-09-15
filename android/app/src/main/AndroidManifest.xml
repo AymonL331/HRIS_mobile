@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- IN-APP UPDATE (2026-09-15): the app downloads a newer signed APK from the HRIS
+         server and hands it to Android's own installer, which always asks the
+         employee to confirm. Android also asks once to allow "Install unknown apps"
+         for HRIS. Remove this (and the self-update) if the app moves to Google Play. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <!-- Location is MANDATORY, PRECISE and ALWAYS (2026-09-14): the app is blocked
          unless the employee has granted "Allow all the time" with "Use precise
          location" on. Fine + coarse are both declared because Android 12+ only
@@ -77,6 +82,17 @@
             android:foregroundServiceType="location"
             android:stopWithTask="false"
             android:exported="false" />
+        <!-- IN-APP UPDATE: shares ONLY the downloaded update (cache/updates/) with
+             Android's installer — see res/xml/update_file_paths.xml. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.update_provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_file_paths" />
+        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

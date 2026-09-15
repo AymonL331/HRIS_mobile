@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/auth/session_controller.dart';
+import 'features/app_update/update_gate.dart';
 import 'features/auth/change_password_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/splash_screen.dart';
@@ -25,6 +26,9 @@ class HrisApp extends StatelessWidget {
       darkTheme: buildTheme(Brightness.dark),
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
+      // In-app update (2026-09-15): above every route, so a newer version is offered
+      // — or a required one enforced — wherever the employee is, login included.
+      builder: (context, child) => UpdateGate(child: child ?? const SizedBox.shrink()),
       home: const AppRoot(),
     );
   }

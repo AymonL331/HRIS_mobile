@@ -13,6 +13,7 @@ import '../../shared/widgets/status_badge.dart';
 import '../consent/consent_screen.dart';
 import '../face/face_capture_screen.dart';
 import '../face/face_models.dart';
+import '../face_enrollment/enrollment_outcome_banner.dart';
 import '../face_enrollment/face_enrollment_api.dart';
 import '../face_enrollment/face_enrollment_models.dart';
 import '../face_enrollment/face_enrollment_screen.dart';
@@ -20,6 +21,12 @@ import '../tracking/tracking_service.dart';
 import '../tracking/tracking_status_card.dart';
 import 'clock_models.dart';
 import 'time_clock_controller.dart';
+
+/// How often the Time Clock re-reads itself while HR can still change what it offers
+/// (an open face-enrollment pass, a submission under review). Public for the tests.
+abstract final class TimeClockScreenPoll {
+  static const interval = Duration(seconds: 45);
+}
 
 /// The home tab. Server time ticking, today's punches, the worksite range, the
 /// two big buttons, and the outcome of the last tap — laid out like the web
@@ -48,13 +55,16 @@ class TimeClockScreen extends StatefulWidget {
   State<TimeClockScreen> createState() => _TimeClockScreenState();
 }
 
-class _TimeClockScreenState extends State<TimeClockScreen> {
+class _TimeClockScreenState extends State<TimeClockScreen> with WidgetsBindingObserver {
   Timer? _ticker;
+  Timer? _enrollmentPoll;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _enrollmentPoll = Timer.periodic(TimeClockScreenPoll.interval, (_) => _pollEnrollment());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final c = context.read<TimeClockController>();
       if (c.status == null && !c.loading) c.load();
@@ -63,8 +73,33 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _enrollmentPoll?.cancel();
     super.dispose();
+  }
+
+  // Back in the app: re-read the clock. Until 2026-09-15 it only reloaded on first
+  // open, after an enrollment or a punch, or on pull-to-refresh — so a pass HR had
+  // cancelled kept showing "Enroll my face" until the employee refreshed by hand.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    final c = context.read<TimeClockController>();
+    if (!c.busy && !c.loading) c.load(silent: true);
+  }
+
+  // While a pass is open or a submission is under review, HR can change what this
+  // screen offers at any moment (cancel the pass, approve, reject) — re-read it so
+  // the change shows without a manual refresh. Nothing is polled otherwise.
+  void _pollEnrollment() {
+    if (!mounted) return;
+    final c = context.read<TimeClockController>();
+    if (c.busy || c.loading) return;
+    final phase = c.status?.face.selfEnrollment.phase;
+    if (phase == SelfEnrollmentPhase.passOpen || phase == SelfEnrollmentPhase.pending) {
+      c.load(silent: true);
+    }
   }
 
   // Enroll (or re-enroll) from this phone while HR's pass is open, then reload so
@@ -134,6 +169,12 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
             _ReEnrollBanner(state: selfEnrollment, onEnroll: () => _openEnrollment(c)),
             const SizedBox(height: HrisSpace.s3),
           ],
+          // Already enrolled, and HR rejected — or the server blocked — the NEW face.
+          // Without this the banner above simply vanished and the employee was never
+          // told why (2026-09-15). Dismissible per submission; spaces itself.
+          if (selfEnrollment.phase == SelfEnrollmentPhase.rejected ||
+              selfEnrollment.phase == SelfEnrollmentPhase.blocked)
+            EnrollmentOutcomeBanner(state: selfEnrollment, employeeCode: status.employeeCode),
           _TodayCard(status: status),
           const SizedBox(height: HrisSpace.s3),
           _WorksiteCard(controller: c),
@@ -551,7 +592,7 @@ class _NotEnrolled extends StatelessWidget {
       SelfEnrollmentPhase.rejected => (
           Icons.face_retouching_off_outlined,
           'Face enrollment not approved',
-          '${state.reason != null && state.reason!.isNotEmpty ? 'HR said: ${state.reason}\n\n' : ''}'
+          '${state.reason != null && state.reason!.isNotEmpty ? 'Reason: ${state.reason}\n\n' : ''}'
               'Ask HR to allow face enrollment again, then try in good light, facing the camera.',
         ),
       SelfEnrollmentPhase.blocked => (

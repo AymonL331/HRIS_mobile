@@ -6,6 +6,7 @@ import 'package:hris_mobile/core/config/env_store.dart';
 import 'package:hris_mobile/core/http/api_exception.dart';
 import 'package:hris_mobile/features/face/face_capture_screen.dart';
 import 'package:hris_mobile/features/face/face_models.dart';
+import 'package:hris_mobile/features/face_enrollment/enrollment_outcome_banner.dart';
 import 'package:hris_mobile/features/face_enrollment/face_enrollment_api.dart';
 import 'package:hris_mobile/features/face_enrollment/face_enrollment_models.dart';
 import 'package:hris_mobile/features/face_enrollment/face_enrollment_screen.dart';
@@ -27,6 +28,16 @@ class FakeFaceEnrollmentApi implements FaceEnrollmentApi {
   final List<FaceCapture> submits = [];
   ApiException? submitError;
   int challenges = 0;
+
+  /// What the server says NOW about the pass (HR may cancel it mid-flow).
+  SelfEnrollmentState current = const SelfEnrollmentState(phase: SelfEnrollmentPhase.passOpen);
+  int stateCalls = 0;
+
+  @override
+  Future<SelfEnrollmentState> state() async {
+    stateCalls += 1;
+    return current;
+  }
 
   @override
   Future<FaceChallenge> challenge() async {
@@ -151,7 +162,7 @@ void main() {
         enrollment: FakeFaceEnrollmentApi(),
       );
       expect(find.text('Face enrollment not approved'), findsOneWidget);
-      expect(find.textContaining('Photo too dark'), findsOneWidget);
+      expect(find.textContaining('Reason: Photo too dark'), findsOneWidget);
     });
 
     testWidgets('an enrolled employee with an open pass sees "Re-enroll on this phone" above the clock', (tester) async {
@@ -162,6 +173,107 @@ void main() {
       );
       expect(find.text('Time In'), findsOneWidget);
       expect(find.text('Re-enroll on this phone'), findsOneWidget);
+    });
+
+    // 2026-09-15: for an ENROLLED employee the re-enroll banner used to vanish on
+    // rejection, so they were never told why. Found in the sandbox walkthrough.
+    testWidgets("an enrolled employee whose new face was rejected sees HR's reason above the clock, and can dismiss it", (tester) async {
+      await mountClock(
+        tester,
+        status: statusJson(selfEnrollment: {'state': 'rejected', 'reason': 'Photo too dark', 'submitted_at': '2026-09-15T06:11:40.000Z'}),
+        enrollment: FakeFaceEnrollmentApi(),
+      );
+      await settle(tester);
+      expect(find.text('Time In'), findsOneWidget);
+      expect(find.text('New face enrollment not approved'), findsOneWidget);
+      // A plain label, not a persona (user, 2026-09-15): "Reason:", never "HR said:".
+      expect(find.textContaining('Reason: Photo too dark'), findsOneWidget);
+      expect(find.textContaining('HR said'), findsNothing);
+      expect(find.textContaining('keep clocking with your current face'), findsOneWidget);
+
+      await tester.tap(find.text('Dismiss'));
+      await settle(tester);
+      expect(find.text('New face enrollment not approved'), findsNothing);
+      expect(find.text('Time In'), findsOneWidget);
+    });
+
+    testWidgets('an enrolled employee whose new face was blocked is told so, naming nobody', (tester) async {
+      await mountClock(
+        tester,
+        status: statusJson(selfEnrollment: {
+          'state': 'blocked',
+          'reason': "This face couldn't be accepted for your account. Ask HR.",
+          'submitted_at': '2026-09-15T06:20:00.000Z',
+        }),
+        enrollment: FakeFaceEnrollmentApi(),
+      );
+      await settle(tester);
+      expect(find.text('New face enrollment not accepted'), findsOneWidget);
+      expect(find.textContaining("couldn't be accepted for your account"), findsOneWidget);
+      expect(find.text('Time In'), findsOneWidget);
+    });
+
+    testWidgets('a cancelled pass takes "Enroll my face" away by itself — no manual refresh', (tester) async {
+      final mounted = await mountClock(
+        tester,
+        status: statusJson(faceEnrolled: false, selfEnrollment: {'state': 'pass_open'}),
+        enrollment: FakeFaceEnrollmentApi(),
+      );
+      expect(find.text('Enroll my face'), findsOneWidget);
+
+      mounted.api.status_ = statusJson(faceEnrolled: false); // HR cancelled the pass
+      await tester.pump(TimeClockScreenPoll.interval + const Duration(seconds: 1));
+      await settle(tester);
+      expect(find.text('Enroll my face'), findsNothing);
+      expect(find.text('Face not enrolled yet'), findsOneWidget);
+    });
+
+    testWidgets('coming back to the app re-reads the Time Clock', (tester) async {
+      final mounted = await mountClock(tester, status: statusJson(), enrollment: FakeFaceEnrollmentApi());
+      final before = mounted.api.statusCalls;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await settle(tester);
+      expect(mounted.api.statusCalls, greaterThan(before));
+    });
+
+    testWidgets('nothing to wait for: the clock is not polled', (tester) async {
+      final mounted = await mountClock(tester, status: statusJson(), enrollment: FakeFaceEnrollmentApi());
+      final before = mounted.api.statusCalls;
+      await tester.pump(TimeClockScreenPoll.interval * 2 + const Duration(seconds: 1));
+      await settle(tester);
+      expect(mounted.api.statusCalls, before);
+    });
+
+    testWidgets('an enrolled employee with nothing to tell sees no outcome banner', (tester) async {
+      await mountClock(tester, status: statusJson(selfEnrollment: {'state': 'none'}), enrollment: FakeFaceEnrollmentApi());
+      await settle(tester);
+      expect(find.textContaining('New face enrollment not'), findsNothing);
+      expect(find.text('Dismiss'), findsNothing);
+    });
+  });
+
+  group('dismissed enrollment notices', () {
+    test('a dismissed outcome stays dismissed on this phone; a NEW submission or another employee shows again', () async {
+      SharedPreferences.setMockInitialValues({});
+      const store = EnrollmentNoticeStore();
+      final first = SelfEnrollmentState.fromJson({'state': 'rejected', 'reason': 'x', 'submitted_at': '2026-09-15T06:09:52.000Z'});
+      final second = SelfEnrollmentState.fromJson({'state': 'rejected', 'reason': 'y', 'submitted_at': '2026-09-15T06:11:40.000Z'});
+      final firstKey = EnrollmentNoticeStore.noticeKey('EMP01670', first)!;
+
+      expect(await store.isDismissed(firstKey), isFalse);
+      await store.dismiss(firstKey);
+      expect(await store.isDismissed(firstKey), isTrue);
+      expect(await store.isDismissed(EnrollmentNoticeStore.noticeKey('EMP01670', second)!), isFalse);
+      expect(await store.isDismissed(EnrollmentNoticeStore.noticeKey('EMP09999', first)!), isFalse,
+          reason: 'another employee signing in on the same phone');
+    });
+
+    test('only a rejected or blocked new face has a notice', () {
+      expect(EnrollmentNoticeStore.noticeKey('EMP01670', SelfEnrollmentState.none), isNull);
+      expect(EnrollmentNoticeStore.noticeKey('EMP01670', SelfEnrollmentState.fromJson({'state': 'pending'})), isNull);
+      expect(EnrollmentNoticeStore.noticeKey('EMP01670', SelfEnrollmentState.fromJson({'state': 'pass_open'})), isNull);
+      expect(EnrollmentNoticeStore.noticeKey('EMP01670', SelfEnrollmentState.fromJson({'state': 'blocked'})), isNotNull);
     });
   });
 
@@ -217,6 +329,65 @@ void main() {
 
       expect(find.textContaining("can't be enrolled on your account"), findsOneWidget);
       expect(find.text('Try again'), findsOneWidget);
+    });
+
+    // 2026-09-15, found on the sandbox: HR cancelled the pass while the employee's
+    // Time Clock still showed "Enroll my face".
+    testWidgets('HR cancelled the pass after the clock was drawn: the screen says so and never opens the camera', (tester) async {
+      final enrollment = FakeFaceEnrollmentApi()..current = SelfEnrollmentState.none;
+      var captures = 0;
+      final mounted = await mountClock(
+        tester,
+        status: statusJson(faceEnrolled: false, selfEnrollment: {'state': 'pass_open'}),
+        enrollment: enrollment,
+        capture: () async {
+          captures += 1;
+          return FaceCaptured(enrollmentCapture());
+        },
+      );
+      mounted.api.status_ = statusJson(faceEnrolled: false); // the server's truth now
+      final loadsBefore = mounted.api.statusCalls;
+
+      await tester.tap(find.text('Enroll my face'));
+      await settle(tester);
+      expect(find.text('Face enrollment is not available'), findsOneWidget);
+      expect(find.textContaining('the pass was cancelled or has expired'), findsOneWidget);
+      expect(find.text('I agree — enroll my face'), findsNothing);
+      expect(find.text('Try again'), findsNothing);
+      expect(captures, 0);
+      expect(enrollment.submits, isEmpty);
+
+      await tester.tap(find.text('Back to Time Clock'));
+      await settle(tester);
+      expect(mounted.api.statusCalls, greaterThan(loadsBefore));
+      expect(find.text('Enroll my face'), findsNothing);
+      expect(find.text('Face not enrolled yet'), findsOneWidget);
+    });
+
+    testWidgets('the pass closes between consent and submit: closed, not "Try again"', (tester) async {
+      final enrollment = FakeFaceEnrollmentApi()
+        ..submitError = const ApiException(
+          status: 422,
+          code: 'FACE_ENROLLMENT_NO_PASS',
+          message: 'Your face enrollment pass was already used or has expired. Ask HR for a new one.',
+        );
+      await mountClock(
+        tester,
+        status: statusJson(faceEnrolled: false, selfEnrollment: {'state': 'pass_open'}),
+        enrollment: enrollment,
+        capture: () async {
+          enrollment.current = SelfEnrollmentState.none; // HR cancels while the camera is open
+          return FaceCaptured(enrollmentCapture());
+        },
+      );
+      await tester.tap(find.text('Enroll my face'));
+      await settle(tester);
+      await tester.ensureVisible(find.text('I agree — enroll my face'));
+      await tester.tap(find.text('I agree — enroll my face'));
+      await settle(tester);
+
+      expect(find.text('Face enrollment is not available'), findsOneWidget);
+      expect(find.text('Try again'), findsNothing);
     });
 
     testWidgets('cancelling the camera returns to the consent card and sends nothing', (tester) async {

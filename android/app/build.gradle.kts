@@ -75,3 +75,10 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // In-app update (2026-09-15): FileProvider hands the downloaded APK to Android's
+    // installer (MainActivity). Already on the device through the plugins; declared
+    // here because the app's own Kotlin now uses it.
+    implementation("androidx.core:core:1.16.0")
+}

@@ -8,12 +8,15 @@ import '../../shared/widgets/message_banner.dart';
 import '../face/face_capture_screen.dart';
 import '../face/face_models.dart';
 import 'face_enrollment_api.dart';
+import 'face_enrollment_models.dart';
 
 /// Runs one face capture for enrollment and hands back what it produced. The
 /// widget tests pass a fake; the app pushes [FaceCaptureScreen].
 typedef EnrollmentCapturer = Future<FaceResult> Function();
 
-enum _Step { consent, working, done, failed }
+/// `closed`: HR cancelled the pass (or it expired, or a submission is already under
+/// review) after the Time Clock was drawn — said plainly, with no "Try again".
+enum _Step { consent, working, done, failed, closed }
 
 /// Enroll your face from this phone (server migration 061), opened from the Time
 /// Clock while HR's one-time pass is open.
@@ -41,6 +44,25 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
   _Step _step = _Step.consent;
   String _working = '';
   String? _error;
+  String _closedMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // The Time Clock may have been drawn before HR cancelled the pass (2026-09-15):
+    // ask again the moment this screen opens, so nobody reads a consent for a pass
+    // that no longer exists. A failed check is not a verdict — the flow checks again.
+    _checkOnOpen();
+  }
+
+  Future<void> _checkOnOpen() async {
+    try {
+      final state = await widget.api.state();
+      if (mounted && _step == _Step.consent && state.phase != SelfEnrollmentPhase.passOpen) _close(state);
+    } catch (_) {
+      // Checked again before the camera opens.
+    }
+  }
 
   Future<FaceResult> _capture() async {
     final override = widget.captureOverride;
@@ -62,9 +84,24 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
   Future<void> _start() async {
     setState(() {
       _step = _Step.working;
-      _working = 'Opening the camera…';
+      _working = 'Checking your enrollment pass…';
       _error = null;
     });
+    // Asked again right before the camera: HR can cancel the pass at any moment.
+    final SelfEnrollmentState state;
+    try {
+      state = await widget.api.state();
+    } on ApiException catch (e) {
+      _fail(e.message);
+      return;
+    }
+    if (!mounted) return;
+    if (state.phase != SelfEnrollmentPhase.passOpen) {
+      _close(state);
+      return;
+    }
+
+    setState(() => _working = 'Opening the camera…');
     final result = await _capture();
     if (!mounted) return;
 
@@ -73,7 +110,13 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
         setState(() => _step = _Step.consent);
         return;
       case FaceFailed(:final reason, :final serverMessage):
-        _fail(serverMessage ?? faceFailureMessage(reason));
+        // A refusal from the server (the challenge) may mean the pass was closed in
+        // the meantime; a camera or engine problem never does.
+        if (serverMessage != null) {
+          await _failOrClose(serverMessage);
+        } else {
+          _fail(faceFailureMessage(reason));
+        }
         return;
       case FaceCaptured(:final capture):
         if (!capture.hasPhoto) {
@@ -85,7 +128,12 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
           await widget.api.submit(capture);
           if (mounted) setState(() => _step = _Step.done);
         } on ApiException catch (e) {
-          // The server's own words: a blocked face, an expired pass, a pending one.
+          if (e.code == 'FACE_ENROLLMENT_NO_PASS' || e.code == 'FACE_ENROLLMENT_PENDING') {
+            // The pass closed while the camera was open: nothing to try again.
+            await _failOrClose(e.message);
+            return;
+          }
+          // The server's own words — e.g. a face that belongs to someone else.
           _fail(e.message);
         } catch (_) {
           _fail('Something went wrong while sending your face enrollment. Please try again.');
@@ -99,6 +147,33 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
       _step = _Step.failed;
       _error = message;
     });
+  }
+
+  /// The pass is gone (cancelled, expired) or a submission is already under review.
+  void _close(SelfEnrollmentState state) {
+    if (!mounted) return;
+    setState(() {
+      _step = _Step.closed;
+      _closedMessage = state.phase == SelfEnrollmentPhase.pending
+          ? 'Your face enrollment is already waiting for HR review.'
+          : 'HR has closed face enrollment on this phone — the pass was cancelled or has expired. '
+              'Ask HR if you still need to enroll your face.';
+    });
+  }
+
+  /// After a server refusal: closed if the pass really is gone, otherwise a retryable failure.
+  Future<void> _failOrClose(String message) async {
+    try {
+      final state = await widget.api.state();
+      if (!mounted) return;
+      if (state.phase != SelfEnrollmentPhase.passOpen) {
+        _close(state);
+        return;
+      }
+    } catch (_) {
+      // Could not tell — show the refusal itself.
+    }
+    _fail(message);
   }
 
   @override
@@ -117,6 +192,10 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
                   message: _error ?? 'Face enrollment failed.',
                   onRetry: () => setState(() => _step = _Step.consent),
                   onClose: () => Navigator.of(context).pop(false),
+                ),
+              _Step.closed => _ClosedCard(
+                  message: _closedMessage,
+                  onBack: () => Navigator.of(context).pop(false),
                 ),
             },
           ),
@@ -245,6 +324,47 @@ class _DoneCard extends StatelessWidget {
             onPressed: onDone,
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClosedCard extends StatelessWidget {
+  final String message;
+  final VoidCallback onBack;
+
+  const _ClosedCard({required this.message, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = HrisTokens.of(context);
+    return AppCard(
+      maxWidth: 440,
+      centered: true,
+      padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s5, vertical: HrisSpace.s6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock_clock_outlined, size: 40, color: t.muted),
+          const SizedBox(height: HrisSpace.s3),
+          Text(
+            'Face enrollment is not available',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
+          ),
+          const SizedBox(height: HrisSpace.s2),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
+          ),
+          const SizedBox(height: HrisSpace.s5),
+          FilledButton(
+            onPressed: onBack,
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            child: const Text('Back to Time Clock'),
           ),
         ],
       ),
