@@ -51,6 +51,11 @@ class AppDrawer extends StatelessWidget {
   final String username;
   final String? roleName;
 
+  /// The account's profile photo path and the environment it belongs to, for the
+  /// avatar beside the name. Null → the initial.
+  final String? photoUrl;
+  final String? baseUrl;
+
   /// Called after the drawer closes when Sign out is tapped. No footer when null.
   final VoidCallback? onSignOut;
 
@@ -61,6 +66,8 @@ class AppDrawer extends StatelessWidget {
     required this.onSelect,
     required this.username,
     this.roleName,
+    this.photoUrl,
+    this.baseUrl,
     this.onSignOut,
   });
 
@@ -93,7 +100,7 @@ class AppDrawer extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s4, HrisSpace.s4, 0),
               child: Row(
                 children: [
-                  UserAvatar(username),
+                  UserAvatar(username, imageUrl: photoUrl, baseUrl: baseUrl),
                   const SizedBox(width: HrisSpace.s3),
                   Expanded(
                     child: Column(

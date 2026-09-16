@@ -155,6 +155,17 @@ class SessionController extends ChangeNotifier {
     _set(_routeFor(User.fromJson(data['user'] as Map<String, dynamic>)));
   }
 
+  /// HR approved a new profile photo while the app was open (server migration 062).
+  /// The session payload carries the photo, but it is only re-read on a cold start —
+  /// so the screen that learns of the new one tells the session, and every avatar
+  /// follows without a sign-out. A no-op when nothing changed.
+  void setProfilePhotoUrl(String? url) {
+    final u = user;
+    if (u == null || url == null || url.isEmpty || u.profileImageUrl == url) return;
+    final next = u.copyWith(profileImageUrl: url);
+    _set(_state is MustChangePassword ? MustChangePassword(next, _record?.tenant) : SignedIn(next, _record?.tenant));
+  }
+
   /// The password gate is on the user row, so the SAME token keeps working
   /// once the change succeeds — mirror that locally, no re-login.
   void markPasswordChanged() {
