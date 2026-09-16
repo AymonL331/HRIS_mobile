@@ -6,7 +6,9 @@ import 'package:hris_mobile/core/http/api_exception.dart';
 import 'package:hris_mobile/features/profile_photo/profile_photo_api.dart';
 import 'package:hris_mobile/features/profile_photo/profile_photo_models.dart';
 import 'package:hris_mobile/features/profile_photo/profile_photo_screen.dart';
+import 'package:hris_mobile/core/auth/user.dart';
 import 'package:hris_mobile/shared/theme.dart';
+import 'package:hris_mobile/shared/widgets/user_avatar.dart';
 
 // PROFILE PHOTO from the app (server migration 062). What matters: the photo only
 // changes after HR approves (the screen never says otherwise), a rejection shows HR's
@@ -141,6 +143,73 @@ void main() {
     await mount(tester, canSend: false);
     expect(find.text('Take a new photo'), findsNothing);
     expect(find.textContaining('turned off for your account'), findsOneWidget);
+  });
+
+  // The photo is only worth approving if it then SHOWS. It reaches the app in the
+  // session payload (`profile_image_url`), and the avatar in the top bar and the
+  // drawer is where the user looks for it (2026-09-16: it drew the initial only).
+  test('the session payload carries the profile photo; copyWith moves it to a new one', () {
+    final u = User.fromJson({
+      'id': 1, 'tenant_id': 1, 'employee_id': 2316, 'username': 'sofia', 'email': 's@x.test',
+      'role_name': 'Employee', 'must_change_password': false, 'mobile_access_enabled': 1,
+      'profile_image_url': '/api/uploads/employees/abc.jpg',
+    });
+    expect(u.profileImageUrl, '/api/uploads/employees/abc.jpg');
+    expect(u.copyWith(profileImageUrl: '/api/uploads/employees/new.jpg').profileImageUrl, '/api/uploads/employees/new.jpg');
+    // A login with no employee, or no photo yet: blank is the same as none.
+    expect(User.fromJson({'id': 1, 'username': 'admin', 'profile_image_url': '  '}).profileImageUrl, isNull);
+    expect(User.fromJson({'id': 1, 'username': 'admin'}).profileImageUrl, isNull);
+  });
+
+  testWidgets('the avatar draws the photo when there is one', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: const Scaffold(
+        body: UserAvatar('sofia', imageUrl: '/api/uploads/employees/abc.jpg', baseUrl: 'https://hris.test'),
+      ),
+    ));
+    await tester.pump();
+    expect(find.byType(Image), findsOneWidget);
+  });
+
+  testWidgets('the avatar falls back to the initial with no photo, and with no server to fetch it from', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: const Scaffold(body: UserAvatar('sofia')),
+    ));
+    await tester.pump();
+    expect(find.byType(Image), findsNothing);
+    expect(find.text('S'), findsOneWidget);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: const Scaffold(body: UserAvatar('sofia', imageUrl: '/api/uploads/employees/abc.jpg')),
+    ));
+    await tester.pump();
+    expect(find.byType(Image), findsNothing, reason: 'a relative path is unusable without the environment');
+    expect(find.text('S'), findsOneWidget);
+  });
+
+  testWidgets('the screen reports the photo it learned, so the avatars follow an approval', (tester) async {
+    final seen = <String?>[];
+    final api = FakeProfilePhotoApi(const ProfilePhotoState(
+      phase: ProfilePhotoPhase.approved,
+      profileImageUrl: '/api/uploads/employees/approved.jpg',
+    ));
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: Scaffold(
+        body: ProfilePhotoScreen(
+          api: api,
+          baseUrl: 'https://hris.test',
+          canSend: true,
+          onPhotoChanged: seen.add,
+          takePhotoOverride: () async => jpeg,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(seen, ['/api/uploads/employees/approved.jpg']);
   });
 
   testWidgets('the server refusing the grant (403) is explained, not shown raw', (tester) async {

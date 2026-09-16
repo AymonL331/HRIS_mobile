@@ -25,11 +25,23 @@ class SelfEnrollmentState {
   final DateTime? submittedAt;
   final String? reason;
 
+  /// Does HR have a profile photo of me to compare an enrollment against? It is
+  /// the FIRST step (server 2026-09-16): without one HR cannot open a pass at all,
+  /// so the Time Clock says to send a photo rather than "ask HR". Defaults to true
+  /// so a server that predates the field never makes the app invent a step.
+  final bool profilePhotoOnFile;
+
+  /// A profile photo is already with HR, waiting for their decision — so the Time
+  /// Clock says "waiting" rather than asking for a photo that was already sent.
+  final bool profilePhotoPending;
+
   const SelfEnrollmentState({
     required this.phase,
     this.passExpiresAt,
     this.submittedAt,
     this.reason,
+    this.profilePhotoOnFile = true,
+    this.profilePhotoPending = false,
   });
 
   static const none = SelfEnrollmentState(phase: SelfEnrollmentPhase.none);
@@ -49,6 +61,12 @@ class SelfEnrollmentState {
       passExpiresAt: ManilaTime.parseUtc(j['pass_expires_at'] as String?),
       submittedAt: ManilaTime.parseUtc(j['submitted_at'] as String?),
       reason: j['reason'] as String?,
+      profilePhotoOnFile: switch (j['profile_photo_on_file']) {
+        null => true,
+        final v => v == true || v == 1,
+      },
+      profilePhotoPending:
+          j['profile_photo_pending'] == true || j['profile_photo_pending'] == 1,
     );
   }
 

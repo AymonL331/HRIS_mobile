@@ -181,6 +181,8 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
     return RefreshIndicator(
       onRefresh: c.refresh,
       child: CustomScrollView(
+        // Pull works even when the page is short (nobody to show, or an error).
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           if (c.error != null)
             SliverToBoxAdapter(

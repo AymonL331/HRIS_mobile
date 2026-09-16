@@ -201,7 +201,7 @@ void main() {
       final api = FakeClockApi()..status_ = statusJson(faceEnrolled: false);
       await mount(tester, api, FakeFixService());
       expect(find.text('Face not enrolled yet'), findsOneWidget);
-      expect(find.textContaining('Ask HR to enrol you'), findsOneWidget);
+      expect(find.textContaining('Ask HR to enroll you'), findsOneWidget);
       // There is no way to punch from this screen at all.
       expect(find.text('Time In'), findsNothing);
       expect(find.text('Time Out'), findsNothing);

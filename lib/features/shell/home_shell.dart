@@ -88,7 +88,10 @@ class _HomeShellState extends State<HomeShell> {
         ? const AttendanceScreen()
         : const NoEmployeeScreen(what: 'attendance record');
     final pages = <Widget>[
-      hasEmployee ? const TimeClockScreen() : const NoEmployeeScreen(what: 'time clock'),
+      hasEmployee
+          // No profile photo yet → the card points at Profile Photo (index 3).
+          ? TimeClockScreen(onOpenProfilePhoto: () => setState(() => _index = 3))
+          : const NoEmployeeScreen(what: 'time clock'),
       attendance,
       hasEmployee ? const PayslipsScreen() : const NoEmployeeScreen(what: 'payslip'),
       // Server migration 062: a new photo waits for HR before it replaces this one.
@@ -97,6 +100,8 @@ class _HomeShellState extends State<HomeShell> {
               api: _profilePhotoApiOf(context) ?? MobileProfilePhotoApi(session),
               baseUrl: session.env.baseUrl,
               canSend: user?.canSendProfilePhoto ?? false,
+              // An approval lands while the app is open: the avatars follow it here.
+              onPhotoChanged: session.setProfilePhotoUrl,
             )
           : const NoEmployeeScreen(what: 'profile photo'),
       const SettingsScreen(),
@@ -167,7 +172,11 @@ class _HomeShellState extends State<HomeShell> {
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: HrisSpace.s5),
-              child: UserAvatar(user?.username ?? ''),
+              child: UserAvatar(
+                user?.username ?? '',
+                imageUrl: user?.profileImageUrl,
+                baseUrl: session.env.baseUrl,
+              ),
             ),
           ],
         ),
@@ -177,6 +186,8 @@ class _HomeShellState extends State<HomeShell> {
           onSelect: (i) => setState(() => _index = i),
           username: user?.username ?? '',
           roleName: user?.roleName,
+          photoUrl: user?.profileImageUrl,
+          baseUrl: session.env.baseUrl,
           // The drawer closes first; the confirmation then opens over the page.
           onSignOut: () => confirmSignOut(context),
         ),

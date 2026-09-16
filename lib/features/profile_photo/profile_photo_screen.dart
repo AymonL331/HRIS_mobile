@@ -29,6 +29,10 @@ class ProfilePhotoScreen extends StatefulWidget {
   /// The login holds `profile_photo:create`.
   final bool canSend;
 
+  /// The photo the server reports as mine, whenever this screen learns it — so the
+  /// avatars elsewhere in the app follow an approval without a sign-out.
+  final ValueChanged<String?>? onPhotoChanged;
+
   /// Replaces the real camera. Only the widget tests pass this.
   @visibleForTesting
   final PhotoTaker? takePhotoOverride;
@@ -38,6 +42,7 @@ class ProfilePhotoScreen extends StatefulWidget {
     required this.api,
     required this.baseUrl,
     required this.canSend,
+    this.onPhotoChanged,
     this.takePhotoOverride,
   });
 
@@ -75,6 +80,7 @@ class _ProfilePhotoScreenState extends State<ProfilePhotoScreen> {
         _state = state;
         _loading = false;
       });
+      widget.onPhotoChanged?.call(state.profileImageUrl);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -120,6 +126,7 @@ class _ProfilePhotoScreenState extends State<ProfilePhotoScreen> {
         _sending = false;
         _justSent = true;
       });
+      widget.onPhotoChanged?.call(state.profileImageUrl);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -138,13 +145,17 @@ class _ProfilePhotoScreenState extends State<ProfilePhotoScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_loadError != null && _state == null) {
-      return ListView(
-        padding: const EdgeInsets.all(HrisSpace.s4),
-        children: [
-          MessageBanner.error(_loadError!),
-          const SizedBox(height: HrisSpace.s3),
-          OutlinedButton(onPressed: _load, child: const Text('Try again')),
-        ],
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(HrisSpace.s4),
+          children: [
+            MessageBanner.error(_loadError!),
+            const SizedBox(height: HrisSpace.s3),
+            OutlinedButton(onPressed: _load, child: const Text('Try again')),
+          ],
+        ),
       );
     }
 
@@ -154,6 +165,8 @@ class _ProfilePhotoScreenState extends State<ProfilePhotoScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
+        // Short page, so the gesture needs somewhere to start.
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(HrisSpace.s4),
         children: [
           AppCard(

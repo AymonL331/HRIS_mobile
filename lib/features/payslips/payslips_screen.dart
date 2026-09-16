@@ -70,6 +70,8 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
       return RefreshIndicator(
         onRefresh: c.refresh,
         child: ListView(
+          // Pull works on this one-card empty state too.
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(HrisSpace.s4),
           children: [
             AppCard(
@@ -109,6 +111,7 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
     return RefreshIndicator(
       onRefresh: c.refresh,
       child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           // A page that failed AFTER rows are already on screen warns in place —
           // the rows above it are still true.

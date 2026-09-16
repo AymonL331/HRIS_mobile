@@ -66,6 +66,7 @@ Future<({TimeClockController controller, FakeClockApi api})> mountClock(
   required Map<String, dynamic> status,
   required FakeFaceEnrollmentApi enrollment,
   EnrollmentCapturer? capture,
+  VoidCallback? onOpenProfilePhoto,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final env = EnvStore();
@@ -84,6 +85,7 @@ Future<({TimeClockController controller, FakeClockApi api})> mountClock(
           captureOverride: FakeFaceCapturer().call,
           enrollmentApiOverride: enrollment,
           enrollmentCaptureOverride: capture ?? () async => FaceCaptured(enrollmentCapture()),
+          onOpenProfilePhoto: onOpenProfilePhoto,
         ),
       ),
     ),
@@ -113,6 +115,14 @@ void main() {
       expect(SelfEnrollmentState.fromJson({'state': 'something new'}).phase, SelfEnrollmentPhase.none);
     });
 
+    test('whether HR has a profile photo to compare against rides along; an older server means yes', () {
+      // Defaulting to TRUE matters: a server without the field must not make the app
+      // demand a step that server does not enforce.
+      expect(SelfEnrollmentState.fromJson({'state': 'none'}).profilePhotoOnFile, isTrue);
+      expect(SelfEnrollmentState.fromJson({'state': 'none', 'profile_photo_on_file': false}).profilePhotoOnFile, isFalse);
+      expect(SelfEnrollmentState.fromJson({'state': 'none', 'profile_photo_on_file': true}).profilePhotoOnFile, isTrue);
+    });
+
     test('the clock status carries it under face.self_enrollment', () {
       final s = ClockStatus.fromJson(statusJson(faceEnrolled: false, selfEnrollment: {'state': 'pass_open'}));
       expect(s.face.selfEnrollment.canEnroll, isTrue);
@@ -137,6 +147,90 @@ void main() {
   });
 
   group('the Time Clock cards', () {
+    // A NEW employee's landing page. Before 2026-09-16 it said "ask HR" — a dead end,
+    // because HR cannot open a pass until there is a profile photo to compare the
+    // face against. The first step is now stated, with the way to do it.
+    testWidgets('no profile photo yet: the first step is stated, and the button opens Profile Photo', (tester) async {
+      var opened = 0;
+      await mountClock(
+        tester,
+        status: statusJson(faceEnrolled: false, selfEnrollment: {'state': 'none', 'profile_photo_on_file': false}),
+        enrollment: FakeFaceEnrollmentApi()..current = const SelfEnrollmentState(phase: SelfEnrollmentPhase.none),
+        onOpenProfilePhoto: () => opened += 1,
+      );
+
+      expect(find.text('Send your profile photo first'), findsOneWidget);
+      expect(find.textContaining('choose Profile Photo'), findsOneWidget);
+      expect(find.text('Face not enrolled yet'), findsNothing);
+      await tester.tap(find.text('Open Profile Photo'));
+      await tester.pump();
+      expect(opened, 1);
+    });
+
+    testWidgets('photo sent and with HR: the card says WAIT, and does not ask for it again', (tester) async {
+      final r = await mountClock(
+        tester,
+        status: statusJson(
+          faceEnrolled: false,
+          selfEnrollment: {'state': 'none', 'profile_photo_on_file': false, 'profile_photo_pending': true},
+        ),
+        enrollment: FakeFaceEnrollmentApi()..current = const SelfEnrollmentState(phase: SelfEnrollmentPhase.none),
+        onOpenProfilePhoto: () {},
+      );
+
+      expect(find.text('Waiting for HR to check your photo'), findsOneWidget);
+      expect(find.text('Send your profile photo first'), findsNothing);
+      expect(find.text('Open Profile Photo'), findsNothing);
+
+      // …and it can be re-read without closing the app (user, 2026-09-16).
+      final before = r.api.statusCalls;
+      await tester.tap(find.text('Check again'));
+      await settle(tester);
+      expect(r.api.statusCalls, greaterThan(before));
+    });
+
+    testWidgets('the waiting card PULLS DOWN to refresh — no need to close and reopen the app', (tester) async {
+      final r = await mountClock(
+        tester,
+        status: statusJson(
+          faceEnrolled: false,
+          selfEnrollment: {'state': 'none', 'profile_photo_on_file': false, 'profile_photo_pending': true},
+        ),
+        enrollment: FakeFaceEnrollmentApi(),
+      );
+      final before = r.api.statusCalls;
+
+      await tester.fling(find.text('Waiting for HR to check your photo'), const Offset(0, 320), 1200);
+      await settle(tester);
+      await tester.pumpAndSettle();
+
+      expect(r.api.statusCalls, greaterThan(before), reason: 'a pull re-reads the clock');
+    });
+
+    testWidgets('a photo IS on file: the old wording stands, and no photo button', (tester) async {
+      await mountClock(
+        tester,
+        status: statusJson(faceEnrolled: false, selfEnrollment: {'state': 'none', 'profile_photo_on_file': true}),
+        enrollment: FakeFaceEnrollmentApi()..current = const SelfEnrollmentState(phase: SelfEnrollmentPhase.none),
+        onOpenProfilePhoto: () {},
+      );
+
+      expect(find.text('Face not enrolled yet'), findsOneWidget);
+      expect(find.text('Open Profile Photo'), findsNothing);
+    });
+
+    testWidgets('a pass is open but the photo was removed: the photo comes first, not the camera', (tester) async {
+      await mountClock(
+        tester,
+        status: statusJson(faceEnrolled: false, selfEnrollment: {'state': 'pass_open', 'profile_photo_on_file': false}),
+        enrollment: FakeFaceEnrollmentApi(),
+        onOpenProfilePhoto: () {},
+      );
+
+      expect(find.text('Send your profile photo first'), findsOneWidget);
+      expect(find.text('Enroll my face'), findsNothing, reason: 'the capture would only be refused');
+    });
+
     testWidgets('no pass: told to ask HR, and nothing to tap', (tester) async {
       await mountClock(tester, status: statusJson(faceEnrolled: false), enrollment: FakeFaceEnrollmentApi());
       expect(find.text('Face not enrolled yet'), findsOneWidget);

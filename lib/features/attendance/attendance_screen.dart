@@ -66,6 +66,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return RefreshIndicator(
       onRefresh: c.refresh,
       child: CustomScrollView(
+        // Pull works even when the page is short (an empty month, an error card).
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           if (c.error != null)
             SliverToBoxAdapter(
