@@ -176,7 +176,11 @@ class TrackingTaskHandler extends TaskHandler {
     } on PermissionDeniedException {
       await _notePermissionLost();
     } catch (_) {
-      // No fix this time (deep indoors). The trail shows the silence as a gap.
+      // No fix this time (indoors, in a vehicle). Say so: a `no_fix` event carries
+      // no position but tells the trail the phone was alive and simply had no sky,
+      // so the gap reads "no GPS" instead of "nothing from the phone", and the
+      // live map does not declare tracking lost (migration 065).
+      await _event('no_fix');
     }
   }
 

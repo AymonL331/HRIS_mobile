@@ -17,6 +17,7 @@ import '../face_enrollment/enrollment_outcome_banner.dart';
 import '../face_enrollment/face_enrollment_api.dart';
 import '../face_enrollment/face_enrollment_models.dart';
 import '../face_enrollment/face_enrollment_screen.dart';
+import '../tracking/battery_warning_card.dart';
 import '../tracking/tracking_service.dart';
 import '../tracking/tracking_status_card.dart';
 import 'clock_models.dart';
@@ -221,6 +222,9 @@ class _TimeClockScreenState extends State<TimeClockScreen>
             _TodayCard(status: status),
             const SizedBox(height: HrisSpace.s3),
             _WorksiteCard(controller: c),
+            // While a shift is being recorded, a phone that may kill the app in
+            // the background is warned about right here (re-checked on resume).
+            if (status.tracking.active) const BatteryWarningCard(),
             if (status.tracking.active && c.tracking != null)
               ValueListenableBuilder<TrackingSnapshot>(
                 valueListenable: c.tracking!.snapshot,
