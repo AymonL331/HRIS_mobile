@@ -16,8 +16,9 @@ abstract class ReminderSync {
 
 /// The signed-in app's side of the reminders: after every status load the
 /// alarms are re-planned (a clock-in cancels today's clock-in ladder), the
-/// connection the alarm callback will need is written down, and a sign-out
-/// cancels everything. One operation at a time, like tracking's sync.
+/// connection the alarm callback will need is written down, the background
+/// refresh is (once) registered, and a sign-out cancels everything. One
+/// operation at a time, like tracking's sync.
 class ReminderCoordinator implements ReminderSync {
   final SessionController session;
   final ReminderStore store;
@@ -43,10 +44,12 @@ class ReminderCoordinator implements ReminderSync {
           appVersion: session.appVersion,
         ));
         await scheduler.sync(status: LastStatus.fromClock(status));
+        await scheduler.ensureRefresh();
       }, 'sync');
 
-  /// Settings › "Sync now": fetch the schedule again whatever its age.
-  Future<void> resync() => _serial(() => scheduler.sync(force: true), 'resync');
+  /// A quiet re-plan (Settings opening its row) — never something the employee
+  /// is asked to do.
+  Future<void> resync() => _serial(() => scheduler.sync(), 'resync');
 
   Future<void> clear() => _serial(scheduler.clear, 'clear');
 

@@ -37,6 +37,10 @@ abstract class ReminderStore {
   Future<ReminderConnection?> connection();
   Future<void> saveConnection(ReminderConnection connection);
 
+  /// Whether the periodic background refresh has been registered with Android.
+  Future<bool> refreshArmed();
+  Future<void> saveRefreshArmed(bool armed);
+
   /// Sign-out: forget everything, including the connection, so a fired alarm
   /// finds nothing to act on.
   Future<void> clear();
@@ -63,7 +67,8 @@ class PrefsReminderStore implements ReminderStore {
   static const _baseUrl = 'reminders.base_url';
   static const _envKey = 'reminders.env_key';
   static const _appVersion = 'reminders.app_version';
-  static const _keys = [_shown, _armed, _schedule, _lastSync, _lastStatus, _baseUrl, _envKey, _appVersion];
+  static const _refresh = 'reminders.refresh_armed';
+  static const _keys = [_shown, _armed, _schedule, _lastSync, _lastStatus, _baseUrl, _envKey, _appVersion, _refresh];
 
   @override
   Future<Set<String>> shownKeys() async =>
@@ -138,6 +143,12 @@ class PrefsReminderStore implements ReminderStore {
   }
 
   @override
+  Future<bool> refreshArmed() async => await _prefs.getString(_refresh) == '1';
+
+  @override
+  Future<void> saveRefreshArmed(bool armed) => armed ? _prefs.setString(_refresh, '1') : _prefs.remove(_refresh);
+
+  @override
   Future<void> clear() async {
     for (final k in _keys) {
       await _prefs.remove(k);
@@ -176,6 +187,7 @@ class InMemoryReminderStore implements ReminderStore {
   DateTime? syncedAt;
   LastStatus? status;
   ReminderConnection? conn;
+  bool refresh = false;
 
   @override
   Future<Set<String>> shownKeys() async => shown.map(keyOfShownEntry).toSet();
@@ -215,6 +227,12 @@ class InMemoryReminderStore implements ReminderStore {
   Future<void> saveConnection(ReminderConnection c) async => conn = c;
 
   @override
+  Future<bool> refreshArmed() async => refresh;
+
+  @override
+  Future<void> saveRefreshArmed(bool armed) async => refresh = armed;
+
+  @override
   Future<void> clear() async {
     shown = [];
     armedAlarms = [];
@@ -222,5 +240,6 @@ class InMemoryReminderStore implements ReminderStore {
     syncedAt = null;
     status = null;
     conn = null;
+    refresh = false;
   }
 }

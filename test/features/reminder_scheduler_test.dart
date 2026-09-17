@@ -130,22 +130,36 @@ void main() {
       expect(store.syncedAt, now);
     });
 
-    test('a clock-in re-plans WITHOUT fetching (the schedule is fresh) and cancels today\'s clock-in alarm', () async {
+    test('a clock-in re-plans (the schedule is fetched every time) and cancels today\'s clock-in alarm', () async {
       await s.sync(status: const LastStatus(localDate: '2026-09-11'));
       now = now.add(const Duration(minutes: 5));
       await s.sync(status: LastStatus(localDate: '2026-09-11', clockInAt: now));
-      expect(api.calls, 1, reason: 'within 15 min, same day: the stored schedule is used');
+      expect(api.calls, 2, reason: 'never a stale copy: every sync asks the server');
       expect(alarms.cancelled, [alarmIdOf(alarm(alarmJson()))]);
       expect((await store.armed()).length, 4);
     });
 
-    test('the schedule is fetched again after 15 minutes, on a new day, or when forced', () async {
-      await s.sync(status: const LastStatus(localDate: '2026-09-11'));
-      now = now.add(const Duration(minutes: 16));
+    test('the server\'s view of today wins: a reset (no punches) re-arms the clock-in ladder, a kiosk clock-out drops the clock-out one', () async {
+      // The phone believes Sofia is clocked in; the server says the day was reset.
+      api.json = {...scheduleJson(), 'today': null};
+      await s.sync(status: LastStatus(localDate: '2026-09-11', clockInAt: now));
+      expect(alarms.scheduled.containsKey(alarmIdOf(alarm(alarmJson()))), isTrue, reason: 'clock-in stage armed again');
+      expect((await store.lastStatus())!.clockInAt, isNull, reason: 'the reset is now what the phone knows');
+
+      // The server says she clocked out at the kiosk; the phone never saw it.
+      api.json = {...scheduleJson(), 'today': {'attendance_log_id': 1, 'clock_in_at': '2026-09-11T00:05:00.000Z', 'clock_out_at': '2026-09-11T01:00:00.000Z'}};
       await s.sync();
-      expect(api.calls, 2);
-      await s.sync(force: true);
-      expect(api.calls, 3);
+      expect(alarms.scheduled.keys.where((id) => id == alarmIdOf(alarm(alarmJson(kind: 'clock_out', slot: 1, time: '18:00')))), isEmpty);
+      expect((await store.armed()).where((a) => a.date == '2026-09-11'), isEmpty, reason: 'today fully punched: nothing left today');
+      expect((await store.armed()).length, 2, reason: 'tomorrow stays');
+    });
+
+    test('an old server (no `today` field) leaves the phone\'s own status in force', () async {
+      final j = scheduleJson()..remove('today');
+      api.json = j;
+      await s.sync(status: LastStatus(localDate: '2026-09-11', clockInAt: now));
+      expect((await store.lastStatus())!.clockInAt, isNotNull);
+      expect(alarms.scheduled.containsKey(alarmIdOf(alarm(alarmJson()))), isFalse);
     });
 
     test('a fetch failure falls back to the stored schedule; with none stored, nothing changes', () async {
@@ -153,22 +167,27 @@ void main() {
       await s.sync(status: const LastStatus(localDate: '2026-09-11'));
       expect(alarms.scheduled, isEmpty);
       api.error = null;
-      await s.sync(force: true);
+      await s.sync();
       expect(alarms.scheduled.length, 5);
       api.error = const ApiException.network('offline');
       now = now.add(const Duration(hours: 1));
-      await s.sync(force: true);
+      await s.sync();
       expect(alarms.scheduled.length, 5, reason: 'stored schedule re-armed');
     });
 
-    test('clear cancels every armed alarm and wipes the store', () async {
+    test('ensureRefresh registers the 5-minute background refresh once; clear cancels it with everything else', () async {
       store.conn = const ReminderConnection(baseUrl: 'http://x', envKey: 'main', appVersion: '1');
+      await s.ensureRefresh();
+      await s.ensureRefresh();
+      expect(alarms.periodics, {reminderRefreshAlarmId: const Duration(minutes: 5)});
       await s.sync(status: const LastStatus(localDate: '2026-09-11'));
       await s.clear();
-      expect(alarms.cancelled.length, 5);
+      expect(alarms.cancelled.length, 6);
+      expect(alarms.periodics, isEmpty);
       expect(await store.armed(), isEmpty);
       expect(await store.connection(), isNull);
       expect(await store.schedule(), isNull);
+      expect(await store.refreshArmed(), isFalse);
     });
 
     test('next() is the earliest armed stage still ahead', () async {

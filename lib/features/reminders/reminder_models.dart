@@ -82,6 +82,12 @@ class ReminderSchedule {
   final bool workingTomorrow;
   final List<ReminderAlarm> alarms;
 
+  /// Today's punches as the server holds them — null when the server predates
+  /// the field (then the phone keeps what the Time Clock last told it). Present
+  /// so a background refresh learns of a kiosk clock-in or an HR reset without
+  /// the app being opened.
+  final LastStatus? status;
+
   const ReminderSchedule({
     required this.enabled,
     required this.timezone,
@@ -91,21 +97,33 @@ class ReminderSchedule {
     required this.workingToday,
     required this.workingTomorrow,
     required this.alarms,
+    this.status,
   });
 
   factory ReminderSchedule.fromJson(Map<String, dynamic> j) {
     final wd = (j['working_day'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final localDate = (j['local_date'] ?? '') as String;
+    final today = j['today'];
     return ReminderSchedule(
       enabled: j['enabled'] == true,
       timezone: (j['timezone'] ?? 'Asia/Manila') as String,
       resolvedFrom: (j['resolved_from'] ?? '') as String,
       serverTime: ManilaTime.parseUtc(j['server_time'] as String?) ?? DateTime.now().toUtc(),
-      localDate: (j['local_date'] ?? '') as String,
+      localDate: localDate,
       workingToday: wd['today'] == true,
       workingTomorrow: wd['tomorrow'] == true,
       alarms: ((j['alarms'] as List?) ?? const [])
           .map((e) => ReminderAlarm.fromJson((e as Map).cast<String, dynamic>()))
           .toList(growable: false),
+      status: !j.containsKey('today')
+          ? null
+          : today is Map
+              ? LastStatus(
+                  localDate: localDate,
+                  clockInAt: ManilaTime.parseUtc(today['clock_in_at'] as String?),
+                  clockOutAt: ManilaTime.parseUtc(today['clock_out_at'] as String?),
+                )
+              : LastStatus(localDate: localDate),
     );
   }
 
@@ -116,6 +134,13 @@ class ReminderSchedule {
         'server_time': serverTime.toUtc().toIso8601String(),
         'local_date': localDate,
         'working_day': {'today': workingToday, 'tomorrow': workingTomorrow},
+        if (status != null)
+          'today': status!.clockInAt == null && status!.clockOutAt == null
+              ? null
+              : {
+                  'clock_in_at': status!.clockInAt?.toUtc().toIso8601String(),
+                  'clock_out_at': status!.clockOutAt?.toUtc().toIso8601String(),
+                },
         'alarms': alarms.map((a) => a.toJson()).toList(growable: false),
       };
 }

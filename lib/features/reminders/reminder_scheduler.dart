@@ -7,10 +7,14 @@ import 'reminder_notifier.dart';
 import 'reminder_store.dart';
 import 'reminders_api.dart';
 
-/// The one thing the scheduler asks of Android. Abstract so the planning is
-/// unit-tested without an alarm manager.
+/// What the scheduler asks of Android. Abstract so the planning is unit-tested
+/// without an alarm manager.
 abstract class AlarmPort {
   Future<bool> schedule({required int id, required DateTime at, required Map<String, dynamic> params});
+
+  /// A repeating, inexact wake-up (the background refresh).
+  Future<bool> periodic({required int id, required Duration every});
+
   Future<bool> cancel(int id);
 }
 
@@ -32,6 +36,16 @@ class AndroidAlarmPort implements AlarmPort {
         allowWhileIdle: true,
         rescheduleOnReboot: true,
         params: params,
+      );
+
+  @override
+  Future<bool> periodic({required int id, required Duration every}) => AndroidAlarmManager.periodic(
+        every,
+        id,
+        reminderRefreshCallback,
+        wakeup: true,
+        allowWhileIdle: true,
+        rescheduleOnReboot: true,
       );
 
   @override
@@ -79,49 +93,48 @@ abstract final class ReminderPlan {
   }
 }
 
-/// Keeps Android's alarms equal to the plan: fetch the schedule (or re-use the
-/// stored one), decide which stages still apply, cancel what is no longer
-/// wanted, arm the rest.
+/// The background refresh: its alarm id, and how often it runs. Every five
+/// minutes, so a ladder HR just changed, a day HR just reset, or a clock-in
+/// made at the kiosk reaches the phone without anyone opening the app — the
+/// employee is never asked to "sync" anything (user decision 2026-09-17).
+const reminderRefreshAlarmId = 0x30000000;
+const reminderRefreshEvery = Duration(minutes: 5);
+
+/// Keeps Android's alarms equal to the plan: fetch the schedule (falling back
+/// to the stored one when the server is unreachable), decide which stages
+/// still apply, cancel what is no longer wanted, arm the rest.
 class ReminderScheduler {
   final ReminderStore store;
   final AlarmPort alarms;
   final ReminderScheduleApi api;
   final DateTime Function() now;
 
-  /// How long a fetched schedule is trusted before it is fetched again. A
-  /// status change in between (a clock-in) re-plans from the stored copy.
-  static const refreshEvery = Duration(minutes: 15);
-
   ReminderScheduler({required this.store, required this.alarms, required this.api, DateTime Function()? now})
       : now = now ?? (() => DateTime.now().toUtc());
 
-  /// Bring the alarms up to date. [status] is the latest clock status when the
-  /// caller has one (the Time Clock); the alarm callback has none and re-plans
-  /// from what was last stored.
-  Future<void> sync({LastStatus? status, bool force = false}) async {
+  /// Bring the alarms up to date. The schedule is fetched every time (it is
+  /// one small call, and a stale copy is exactly what the employee must never
+  /// be asked to fix). When the server answers, ITS view of today's punches
+  /// wins over [status] — it is the newer of the two; when it does not, the
+  /// caller's [status] (the Time Clock's) or the stored one plans the alarms.
+  Future<void> sync({LastStatus? status}) async {
     if (status != null) await store.saveLastStatus(status);
-    final schedule = await _schedule(force: force);
-    if (schedule == null) return;
-    await arm(schedule, status ?? await store.lastStatus());
-  }
-
-  Future<ReminderSchedule?> _schedule({required bool force}) async {
     final stored = await store.schedule();
-    final t = now();
-    if (!force && stored != null) {
-      final last = await store.lastSyncAt();
-      final fresh = last != null && t.difference(last) < refreshEvery && stored.localDate == manilaDateOf(t);
-      if (fresh) return stored;
-    }
+    ReminderSchedule? schedule;
     try {
-      final fetched = await api.schedule();
-      await store.saveSchedule(fetched);
-      await store.saveLastSyncAt(t);
-      return fetched;
+      schedule = await api.schedule();
+      await store.saveSchedule(schedule);
+      await store.saveLastSyncAt(now());
+      if (schedule.status != null) {
+        status = schedule.status;
+        await store.saveLastStatus(status!);
+      }
     } catch (e) {
       debugPrint('reminders: schedule fetch failed, using the stored one: $e');
-      return stored;
+      schedule = stored;
     }
+    if (schedule == null) return;
+    await arm(schedule, status ?? await store.lastStatus());
   }
 
   Future<void> arm(ReminderSchedule schedule, LastStatus? status) async {
@@ -137,11 +150,21 @@ class ReminderScheduler {
     await store.saveArmed(wanted);
   }
 
+  /// Make sure the background refresh is running. Idempotent: re-registering
+  /// the same id replaces the previous alarm.
+  Future<void> ensureRefresh() async {
+    if (await store.refreshArmed()) return;
+    if (await alarms.periodic(id: reminderRefreshAlarmId, every: reminderRefreshEvery)) {
+      await store.saveRefreshArmed(true);
+    }
+  }
+
   /// Sign-out: nothing may fire for an account that is gone.
   Future<void> clear() async {
     for (final a in await store.armed()) {
       await alarms.cancel(alarmIdOf(a));
     }
+    await alarms.cancel(reminderRefreshAlarmId);
     await store.clear();
   }
 

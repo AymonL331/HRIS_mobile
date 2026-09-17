@@ -19,12 +19,15 @@ void main() {
     c = NotificationsController(api: api, notifier: notifier, pollInterval: Duration.zero, observeLifecycle: false);
   });
 
-  test('load fills the list and the badge, and announces NOTHING (a baseline)', () async {
+  test('load fills the list and the badge, and announces NOTHING (a baseline) — but counts the unread rows as shown', () async {
     await c.load();
     expect(c.items.map((n) => n.id), [3, 2, 1]);
     expect(c.unreadCount, 2);
     expect(notifier.shown, isEmpty);
+    expect(notifier.marked, ['srv:3', 'srv:1'], reason: 'the badge has them; the background refresh must not re-announce them');
     expect(c.loading, isFalse);
+    await c.load();
+    expect(notifier.marked.length, 2, reason: 'only the FIRST load baselines');
   });
 
   test('a poll announces only UNREAD rows never seen before, once', () async {

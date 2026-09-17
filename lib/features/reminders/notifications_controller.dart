@@ -107,6 +107,16 @@ class NotificationsController extends ChangeNotifier with WidgetsBindingObserver
     try {
       final (page, count) = await _fetch();
       if (requestId != _requestId) return;
+      // The FIRST load is the baseline: what is already here is on the badge,
+      // not news — so the background refresh must not announce it later either.
+      if (_seen == null) {
+        final notifier = this.notifier;
+        if (notifier != null) {
+          for (final n in page.items.where((n) => !n.isRead)) {
+            unawaited(notifier.markShown(n));
+          }
+        }
+      }
       _seen = page.items.map((n) => n.id).toSet();
       _items = page.items;
       _unreadCount = count;

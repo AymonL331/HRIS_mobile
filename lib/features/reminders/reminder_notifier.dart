@@ -15,6 +15,11 @@ abstract class ReminderNotifier {
   /// Show a server reminder unless it was shown before. Returns true if shown.
   Future<bool> showIfNew(AppNotification n);
 
+  /// Count a reminder as shown WITHOUT showing it — the bell already has it in
+  /// front of the employee (a cold start's first load), so the background
+  /// refresh must not announce it minutes later as if it were news.
+  Future<void> markShown(AppNotification n);
+
   /// The phone is offline at reminder time: show the stage's own text, once,
   /// saying it could not be confirmed. Returns true if shown.
   Future<bool> showLocalFallback(ReminderAlarm a);
@@ -103,6 +108,9 @@ class LocalReminderNotifier implements ReminderNotifier {
     await store.markShown(key, date);
     return true;
   }
+
+  @override
+  Future<void> markShown(AppNotification n) => store.markShown(serverShownKey(n.id), n.date ?? manilaDateOf(now()));
 
   @override
   Future<bool> showLocalFallback(ReminderAlarm a) async {

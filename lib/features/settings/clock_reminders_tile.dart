@@ -13,7 +13,9 @@ import '../reminders/reminder_models.dart';
 /// notifications allowed, exact alarms allowed (Android 12 asks; 13+ grants
 /// it to the app outright), and whether any reminder is armed at all — which
 /// says whether HR configured a ladder for this branch and when the next one
-/// is. "Sync now" fetches the schedule again, for right after HR changed it.
+/// is. Opening the row re-plans quietly; there is deliberately NO button to
+/// "sync" — keeping the phone current is the app's job, never the employee's
+/// (user decision 2026-09-17).
 class ClockRemindersTile extends StatefulWidget {
   const ClockRemindersTile({super.key});
 
@@ -26,7 +28,6 @@ class _ClockRemindersTileState extends State<ClockRemindersTile> with WidgetsBin
   DeviceReadinessService? _device;
   DeviceReadiness? _readiness;
   ReminderAlarm? _next;
-  bool _busy = false;
 
   T? _optional<T>() {
     try {
@@ -42,7 +43,14 @@ class _ClockRemindersTileState extends State<ClockRemindersTile> with WidgetsBin
     WidgetsBinding.instance.addObserver(this);
     _reminders = _optional<ReminderCoordinator?>();
     _device = _optional<DeviceReadinessService>();
-    _check();
+    _refresh();
+  }
+
+  /// Re-plan quietly, then read the state — so the row is current the moment
+  /// it is looked at, without a button.
+  Future<void> _refresh() async {
+    await _reminders?.resync();
+    await _check();
   }
 
   @override
@@ -73,15 +81,6 @@ class _ClockRemindersTileState extends State<ClockRemindersTile> with WidgetsBin
       _readiness = readiness;
       _next = next;
     });
-  }
-
-  Future<void> _sync() async {
-    final r = _reminders;
-    if (r == null) return;
-    setState(() => _busy = true);
-    await r.resync();
-    if (mounted) setState(() => _busy = false);
-    await _check();
   }
 
   Future<void> _fix(Future<void> Function()? request) async {
@@ -122,32 +121,28 @@ class _ClockRemindersTileState extends State<ClockRemindersTile> with WidgetsBin
           subtitle: Text(detail),
           trailing: Text(status, style: TextStyle(fontSize: HrisType.xs, fontWeight: HrisType.semibold, color: colour)),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(HrisSpace.s4, 0, HrisSpace.s4, HrisSpace.s3),
-          child: Wrap(
-            spacing: HrisSpace.s2,
-            runSpacing: HrisSpace.s2,
-            children: [
-              if (noNotifications)
-                OutlinedButton.icon(
-                  onPressed: () => _fix(_device?.requestNotifications),
-                  icon: const Icon(Icons.notifications_outlined),
-                  label: const Text('Allow notifications'),
-                ),
-              if (noExactAlarms)
-                OutlinedButton.icon(
-                  onPressed: () => _fix(_device?.requestExactAlarms),
-                  icon: const Icon(Icons.alarm_on_outlined),
-                  label: const Text('Allow exact alarms'),
-                ),
-              TextButton.icon(
-                onPressed: _busy ? null : _sync,
-                icon: const Icon(Icons.sync, size: 18),
-                label: Text(_busy ? 'Syncing…' : 'Sync now'),
-              ),
-            ],
+        if (blocked)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(HrisSpace.s4, 0, HrisSpace.s4, HrisSpace.s3),
+            child: Wrap(
+              spacing: HrisSpace.s2,
+              runSpacing: HrisSpace.s2,
+              children: [
+                if (noNotifications)
+                  OutlinedButton.icon(
+                    onPressed: () => _fix(_device?.requestNotifications),
+                    icon: const Icon(Icons.notifications_outlined),
+                    label: const Text('Allow notifications'),
+                  ),
+                if (noExactAlarms)
+                  OutlinedButton.icon(
+                    onPressed: () => _fix(_device?.requestExactAlarms),
+                    icon: const Icon(Icons.alarm_on_outlined),
+                    label: const Text('Allow exact alarms'),
+                  ),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }

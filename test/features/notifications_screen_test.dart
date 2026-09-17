@@ -153,11 +153,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Clock reminders'), findsOneWidget);
-      expect(find.text('None scheduled'), findsOneWidget);
       expect(find.text('Allow exact alarms'), findsNothing);
-
-      await tester.tap(find.text('Sync now'));
-      await tester.pumpAndSettle();
+      // No button: opening the row re-planned on its own.
+      expect(find.text('Sync now'), findsNothing);
       expect(scheduleApi.calls, 1);
       expect(find.text('Ready'), findsOneWidget);
       expect(find.textContaining('Next: clock-in reminder'), findsOneWidget);

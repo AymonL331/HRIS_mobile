@@ -167,17 +167,22 @@ class FakeReminderScheduleApi implements ReminderScheduleApi {
   }
 }
 
-/// Records what was shown; dedupes by key like the real one.
+/// Records what was shown; dedupes by key like the real one. [marked] holds
+/// the keys counted as shown without being shown.
 class FakeReminderNotifier implements ReminderNotifier {
   final shown = <String>[];
+  final marked = <String>[];
 
   @override
   Future<bool> showIfNew(AppNotification n) async {
     final key = 'srv:${n.id}';
-    if (shown.contains(key)) return false;
+    if (shown.contains(key) || marked.contains(key)) return false;
     shown.add(key);
     return true;
   }
+
+  @override
+  Future<void> markShown(AppNotification n) async => marked.add('srv:${n.id}');
 
   @override
   Future<bool> showLocalFallback(ReminderAlarm a) async {
@@ -190,6 +195,7 @@ class FakeReminderNotifier implements ReminderNotifier {
 
 class FakeAlarmPort implements AlarmPort {
   final scheduled = <int, ({DateTime at, Map<String, dynamic> params})>{};
+  final periodics = <int, Duration>{};
   final cancelled = <int>[];
 
   @override
@@ -199,9 +205,16 @@ class FakeAlarmPort implements AlarmPort {
   }
 
   @override
+  Future<bool> periodic({required int id, required Duration every}) async {
+    periodics[id] = every;
+    return true;
+  }
+
+  @override
   Future<bool> cancel(int id) async {
     cancelled.add(id);
     scheduled.remove(id);
+    periodics.remove(id);
     return true;
   }
 }

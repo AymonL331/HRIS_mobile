@@ -99,6 +99,22 @@ void main() {
     expect(notifier.shown, ['local:missing_clock_out_1:2026-09-11']);
   });
 
+  test('the background refresh shows what the alarm missed and re-plans from the server\'s schedule', () async {
+    notifications.rows = [notificationJson(id: 77, type: 'missing_clock_out_1')];
+    scheduleApi.json = {...scheduleJson(), 'today': null};
+    await runReminderRefresh(notifications: notifications, notifier: notifier, scheduler: scheduler);
+    expect(notifier.shown, ['srv:77']);
+    expect(scheduleApi.calls, 1);
+    expect(alarms.scheduled.containsKey(alarmIdOf(clockOut)), isTrue);
+    expect(alarms.scheduled.containsKey(retryAlarmId(clockIn)), isFalse, reason: 'a refresh never retries');
+
+    // Offline: nothing shown, nothing broken, the stored schedule re-armed.
+    notifications.failNext = const ApiException.network('offline');
+    scheduleApi.error = const ApiException.network('offline');
+    await runReminderRefresh(notifications: notifications, notifier: notifier, scheduler: scheduler);
+    expect(notifier.shown, ['srv:77']);
+  });
+
   test('params round-trip through the alarm manager\'s JSON map', () {
     final p = ReminderAlarmParams(alarm: clockIn, retry: 1);
     final back = ReminderAlarmParams.fromParams(p.toParams())!;

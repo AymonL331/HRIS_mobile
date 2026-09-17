@@ -40,7 +40,23 @@ class ReminderAlarmParams {
 /// only knows the stage ids) neither replaces nor cancels it.
 int retryAlarmId(ReminderAlarm a) => 0x20000000 + alarmIdOf(a);
 
-/// What happens when an alarm fires — pure of platform so it can be tested.
+/// Show every unread reminder not shown yet. Returns the page, or null when the
+/// server could not be reached.
+Future<NotificationPage?> showUnreadReminders(NotificationsApi notifications, ReminderNotifier notifier) async {
+  final NotificationPage page;
+  try {
+    page = await notifications.list(unreadOnly: true, limit: 10);
+  } catch (e) {
+    debugPrint('reminders: could not confirm with the server: $e');
+    return null;
+  }
+  for (final n in page.items) {
+    await notifier.showIfNew(n);
+  }
+  return page;
+}
+
+/// What happens when a STAGE alarm fires — pure of platform so it can be tested.
 ///
 /// THE SERVER DECIDES. The phone asks for the unread reminders and shows each
 /// one it has not shown yet. An employee who already clocked in at the office
@@ -60,13 +76,8 @@ Future<void> runReminderAlarm(
   required AlarmPort alarms,
   required DateTime Function() now,
 }) async {
-  var confirmed = false;
-  try {
-    final page = await notifications.list(unreadOnly: true, limit: 10);
-    confirmed = true;
-    for (final n in page.items) {
-      await notifier.showIfNew(n);
-    }
+  final page = await showUnreadReminders(notifications, notifier);
+  if (page != null) {
     final matched = page.items.any((n) => n.type == p.alarm.type && (n.date == null || n.date == p.alarm.date));
     if (!matched && p.retry < 1) {
       await alarms.schedule(
@@ -75,10 +86,7 @@ Future<void> runReminderAlarm(
         params: p.withRetry(1).toParams(),
       );
     }
-  } catch (e) {
-    debugPrint('reminders: could not confirm with the server: $e');
-  }
-  if (!confirmed && ReminderPlan.fallbackAllowed(p.alarm, await store.lastStatus())) {
+  } else if (ReminderPlan.fallbackAllowed(p.alarm, await store.lastStatus())) {
     await notifier.showLocalFallback(p.alarm);
   }
   try {
@@ -88,37 +96,82 @@ Future<void> runReminderAlarm(
   }
 }
 
-/// The alarm's entry point. Top-level and kept by `vm:entry-point` because the
-/// plugin runs it by handle in a fresh engine — no UI, no providers, no session:
-/// the connection comes from the store and the token from secure storage, the
-/// way the tracking service does it.
-@pragma('vm:entry-point')
-Future<void> reminderAlarmCallback(int id, Map<String, dynamic> params) async {
+/// What happens on the periodic REFRESH — the phone keeping itself current with
+/// no help from the employee: any reminder not shown yet is shown (a missed
+/// alarm, a phone that was offline), then the schedule — with today's punches —
+/// is fetched and the alarms re-planned (a ladder HR changed, a day HR reset, a
+/// clock-in made elsewhere).
+Future<void> runReminderRefresh({
+  required NotificationsApi notifications,
+  required ReminderNotifier notifier,
+  required ReminderScheduler scheduler,
+}) async {
+  await showUnreadReminders(notifications, notifier);
+  try {
+    await scheduler.sync();
+  } catch (e) {
+    debugPrint('reminders: refresh re-plan failed: $e');
+  }
+}
+
+/// Everything a background callback needs, built from the store and secure
+/// storage — no UI, no providers, no session — the way the tracking service
+/// does it. Null when the phone is signed out.
+Future<({ApiClient client, ReminderStore store, LocalReminderNotifier notifier, ReminderScheduler scheduler})?>
+    _backgroundStack() async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
-  final p = ReminderAlarmParams.fromParams(params);
-  if (p == null) return;
   final store = PrefsReminderStore();
   final conn = await store.connection();
-  if (conn == null) return;
+  if (conn == null) return null;
   final token = (await SecureSessionStore().read(conn.envKey))?.token;
-  if (token == null || token.isEmpty) return;
-
+  if (token == null || token.isEmpty) return null;
   final client = ApiClient(baseUrl: conn.baseUrl, appVersion: conn.appVersion, tokenProvider: () async => token);
   final notifier = LocalReminderNotifier(store: store);
   await notifier.initialize();
-  const alarms = AndroidAlarmPort();
+  return (
+    client: client,
+    store: store,
+    notifier: notifier,
+    scheduler: ReminderScheduler(store: store, alarms: const AndroidAlarmPort(), api: ClientReminderScheduleApi(client)),
+  );
+}
+
+/// The stage alarm's entry point. Top-level and kept by `vm:entry-point`
+/// because the plugin runs it by handle in a fresh engine.
+@pragma('vm:entry-point')
+Future<void> reminderAlarmCallback(int id, Map<String, dynamic> params) async {
+  final p = ReminderAlarmParams.fromParams(params);
+  if (p == null) return;
+  final s = await _backgroundStack();
+  if (s == null) return;
   try {
     await runReminderAlarm(
       p,
-      store: store,
-      notifications: ClientNotificationsApi(client),
-      notifier: notifier,
-      scheduler: ReminderScheduler(store: store, alarms: alarms, api: ClientReminderScheduleApi(client)),
-      alarms: alarms,
+      store: s.store,
+      notifications: ClientNotificationsApi(s.client),
+      notifier: s.notifier,
+      scheduler: s.scheduler,
+      alarms: const AndroidAlarmPort(),
       now: () => DateTime.now().toUtc(),
     );
   } finally {
-    client.close();
+    s.client.close();
+  }
+}
+
+/// The periodic refresh's entry point.
+@pragma('vm:entry-point')
+Future<void> reminderRefreshCallback() async {
+  final s = await _backgroundStack();
+  if (s == null) return;
+  try {
+    await runReminderRefresh(
+      notifications: ClientNotificationsApi(s.client),
+      notifier: s.notifier,
+      scheduler: s.scheduler,
+    );
+  } finally {
+    s.client.close();
   }
 }
