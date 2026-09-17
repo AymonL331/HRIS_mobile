@@ -318,12 +318,13 @@ class SetupWizardScreen extends StatelessWidget {
           banner: hint == null
               ? null
               : MessageBanner.warning(
-                  'On ${hint.brand} phones, also do this (names vary by model):\n• ${hint.steps.join('\n• ')}',
+                  'On ${hint.brand} phones, also do this ${hint.where} (names vary by model):\n• ${hint.steps.join('\n• ')}',
                 ),
           primaryLabel: 'Continue',
           primaryAction: onRequestBattery,
-          secondaryLabel: hint == null ? null : 'Open app settings',
-          secondaryAction: hint == null ? null : onOpenAppSettings,
+          // Only when the brand's steps are on the page that button opens.
+          secondaryLabel: hint != null && hint.onAppInfoPage ? 'Open app settings' : null,
+          secondaryAction: hint != null && hint.onAppInfoPage ? onOpenAppSettings : null,
         );
     }
   }

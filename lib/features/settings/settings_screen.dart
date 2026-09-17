@@ -7,7 +7,7 @@ import '../../core/config/env_store.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/page_header.dart';
-import '../face/face_self_test_screen.dart';
+import '../tracking/background_running_tile.dart';
 
 /// Who is signed in, where the app is pointed, and the version.
 ///
@@ -115,21 +115,10 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => _switchEnv(context),
           ),
         ]),
-        // Sandbox only: a field-test diagnostic, never shown to employees on Main.
-        if (env.selected == AppEnv.sandbox) ...[
-          const SectionLabel('Diagnostics'),
-          group([
-            ListTile(
-              leading: const Icon(Icons.biotech_outlined),
-              title: const Text('Face engine self-check'),
-              subtitle: const Text('Checks the face model files and fingerprints a built-in test face. No camera needed.'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const FaceSelfTestScreen()),
-              ),
-            ),
-          ]),
-        ],
+        // Whether this phone will let the app keep recording during a shift —
+        // always visible, so a phone can be checked before it causes a gap.
+        const SectionLabel('Phone'),
+        group([const BackgroundRunningTile()]),
         const SectionLabel('About'),
         group([
           ListTile(
