@@ -105,6 +105,9 @@ class ScriptedDevice implements DeviceReadinessService {
   Future<void> requestBatteryExemption() async => batteryRequests++;
 
   @override
+  Future<void> requestExactAlarms() async {}
+
+  @override
   Future<void> openAppSettings() async => openedApp++;
 
   @override

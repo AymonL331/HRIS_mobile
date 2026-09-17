@@ -53,6 +53,18 @@ abstract final class Endpoints {
   /// `profile_photo:create` grant). Mobile-token only.
   static const profilePhoto = '/api/me/profile-photo';
 
+  /// CLOCK-IN / CLOCK-OUT REMINDERS (2026-09-17). The bell reads the same rows the
+  /// website's bell does, narrowed to the reminder ladder (`kinds=reminders`); the
+  /// schedule is the ladder as alarm instants, mobile-token only — the phone arms
+  /// an alarm per stage and, when it fires, asks `/notifications` what was sent.
+  static const notifications = '/api/me/notifications';
+  static const notificationsUnreadCount = '/api/me/notifications/unread-count';
+  static const notificationsReadAll = '/api/me/notifications/read-all';
+  static String notification(int id) => '/api/me/notifications/$id';
+  static String notificationRead(int id) => '/api/me/notifications/$id/read';
+  static String notificationAcknowledge(int id) => '/api/me/notifications/$id/acknowledge';
+  static const reminderSchedule = '/api/me/reminder-schedule';
+
   /// The ONE console route a mobile token may read: the team DTR, for a login
   /// that holds attendance:view. GET only; the server refuses everything else
   /// under /api/attendance with MOBILE_SCOPE.

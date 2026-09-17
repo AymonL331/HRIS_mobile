@@ -27,6 +27,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications (the clock reminders) needs java.time on
+        // every Android version the app supports.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -81,4 +84,5 @@ dependencies {
     // installer (MainActivity). Already on the device through the plugins; declared
     // here because the app's own Kotlin now uses it.
     implementation("androidx.core:core:1.16.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

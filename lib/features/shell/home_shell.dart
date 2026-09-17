@@ -19,6 +19,13 @@ import '../payslips/payslips_controller.dart';
 import '../payslips/payslips_screen.dart';
 import '../profile_photo/profile_photo_api.dart';
 import '../profile_photo/profile_photo_screen.dart';
+import '../reminders/notification_bell.dart';
+import '../reminders/notifications_controller.dart';
+import '../reminders/notifications_screen.dart';
+import '../reminders/reminder_coordinator.dart';
+import '../reminders/reminder_notifier.dart';
+import '../reminders/reminder_tap_relay.dart';
+import '../reminders/reminders_api.dart';
 import '../settings/settings_screen.dart';
 import '../time_clock/clock_api.dart';
 import '../time_clock/time_clock_controller.dart';
@@ -27,27 +34,24 @@ import '../tracking/tracking_service.dart';
 import 'app_drawer.dart';
 import 'no_employee_screen.dart';
 
-/// The app's tracking service, or null where none is provided (the widget tests
-/// that mount the whole shell are about navigation, not recording — a real
-/// foreground service cannot run under a test anyway).
-TrackingService? _trackingOf(BuildContext ctx) {
+/// A provided value, or null where none is provided. The widget tests that
+/// mount the whole shell are about navigation: they provide no tracking
+/// service (a real foreground service cannot run under a test), no reminder
+/// machinery, and only the APIs they script — so every optional dependency is
+/// read this way and the shell builds the real one, or nothing, in its place.
+T? _optional<T>(BuildContext ctx) {
   try {
-    return ctx.read<TrackingService>();
+    return ctx.read<T>();
   } on ProviderNotFoundException {
     return null;
   }
 }
 
+TrackingService? _trackingOf(BuildContext ctx) => _optional<TrackingService>(ctx);
+
 /// A profile-photo API injected by a test, or null (the shell then builds the real one
-/// from the session). Tolerates a tree with no such provider at all, like
-/// [_trackingOf], so existing shell tests need no new provider.
-ProfilePhotoApi? _profilePhotoApiOf(BuildContext ctx) {
-  try {
-    return ctx.read<ProfilePhotoApi?>();
-  } on ProviderNotFoundException {
-    return null;
-  }
-}
+/// from the session).
+ProfilePhotoApi? _profilePhotoApiOf(BuildContext ctx) => _optional<ProfilePhotoApi?>(ctx);
 
 /// The signed-in shell. Navigation is the web SIDEBAR (a drawer behind the top
 /// bar's menu button), not a tab bar: with My Payslips the app carries four
@@ -66,6 +70,32 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  ReminderTapRelay? _taps;
+
+  @override
+  void initState() {
+    super.initState();
+    // A tapped reminder notification opens the Time Clock (user decision
+    // 2026-09-17) — whether the tap launched the app (the relay already holds
+    // it) or landed while any page was showing.
+    _taps = _optional<ReminderTapRelay>(context);
+    _taps?.addListener(_onReminderTap);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onReminderTap());
+  }
+
+  @override
+  void dispose() {
+    _taps?.removeListener(_onReminderTap);
+    super.dispose();
+  }
+
+  void _onReminderTap() {
+    final relay = _taps;
+    if (relay == null || relay.value != reminderTapTimeClock || !mounted) return;
+    relay.consume();
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    setState(() => _index = 0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +175,22 @@ class _HomeShellState extends State<HomeShell> {
             api: ctx.read<ClockApi?>() ?? MobileClockApi(ctx.read<SessionController>()),
             fixes: ctx.read<LocationFixService>(),
             tracking: _trackingOf(ctx),
+            reminders: _optional<ReminderSync?>(ctx),
           ),
+        ),
+        // The bell. Not lazy: the badge and the 30 s poll must run from the
+        // moment the shell is up, not from the first time the bell is drawn.
+        // A login with no employee never starts it (nothing to fetch).
+        ChangeNotifierProvider<NotificationsController>(
+          lazy: false,
+          create: (ctx) {
+            final c = NotificationsController(
+              api: _optional<NotificationsApi?>(ctx) ?? MobileNotificationsApi(ctx.read<SessionController>()),
+              notifier: _optional<ReminderNotifier?>(ctx),
+            );
+            if (hasEmployee) c.start();
+            return c;
+          },
         ),
         ChangeNotifierProvider<AttendanceController>(
           create: (ctx) => AttendanceController(
@@ -170,6 +215,12 @@ class _HomeShellState extends State<HomeShell> {
         appBar: AppBar(
           title: const BrandMark(),
           actions: [
+            if (hasEmployee)
+              Builder(
+                builder: (ctx) => NotificationBell(
+                  onOpen: () => NotificationsScreen.open(ctx, ctx.read<NotificationsController>()),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.only(right: HrisSpace.s5),
               child: UserAvatar(

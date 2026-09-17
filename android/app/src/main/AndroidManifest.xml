@@ -39,6 +39,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- CLOCK-IN / CLOCK-OUT REMINDERS (2026-09-17): the app arms one EXACT alarm
+         per reminder stage HR configured on the website, wakes at that time and
+         asks the server whether a reminder was actually sent. USE_EXACT_ALARM is
+         granted without a dialog on Android 13+ (reserved for alarm/reminder
+         apps; Google Play restricts it, which does not apply to this in-house
+         APK — same standing as REQUEST_INSTALL_PACKAGES above). Android 12
+         still needs SCHEDULE_EXACT_ALARM, which the employee can allow from
+         Settings › Phone. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>
     <!-- The face check that gates every punch (2026-09-13). Requested at the
          moment of the first capture, never at launch. `required="false"` on the
          feature so the app still installs on a device with no front camera —
@@ -82,6 +92,26 @@
             android:foregroundServiceType="location"
             android:stopWithTask="false"
             android:exported="false" />
+        <!-- The reminder alarms (android_alarm_manager_plus). The plugin declares
+             none of these itself: the service runs the Dart callback when an
+             alarm fires, the first receiver is what the alarm wakes, and the
+             reboot receiver re-arms the alarms after a restart (the plugin turns
+             it on only while an alarm asked to survive one). -->
+        <service
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false"/>
+        <receiver
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmBroadcastReceiver"
+            android:exported="false"/>
+        <receiver
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.RebootBroadcastReceiver"
+            android:enabled="false"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
         <!-- IN-APP UPDATE: shares ONLY the downloaded update (cache/updates/) with
              Android's installer — see res/xml/update_file_paths.xml. -->
         <provider

@@ -15,12 +15,18 @@ class DeviceReadiness {
   final bool notificationsGranted;
   final bool batteryUnrestricted;
 
+  /// EXACT alarms (the clock-in / clock-out reminders, 2026-09-17). Android 13+
+  /// grants them to the app outright (USE_EXACT_ALARM); Android 12 asks, from
+  /// a Settings page rather than a dialog; older versions never ask.
+  final bool exactAlarmsGranted;
+
   /// `Build.MANUFACTURER`, lower-cased; '' when unknown.
   final String manufacturer;
 
   const DeviceReadiness({
     required this.notificationsGranted,
     required this.batteryUnrestricted,
+    this.exactAlarmsGranted = true,
     this.manufacturer = '',
   });
 
@@ -34,6 +40,9 @@ abstract class DeviceReadinessService {
   Future<void> requestNotifications();
 
   Future<void> requestBatteryExemption();
+
+  /// Android 12's "Alarms & reminders" page for this app; a no-op elsewhere.
+  Future<void> requestExactAlarms();
 
   Future<void> openAppSettings();
 
@@ -56,6 +65,7 @@ class PlatformReadinessService implements DeviceReadinessService {
     return DeviceReadiness(
       notificationsGranted: await _granted(ph.Permission.notification),
       batteryUnrestricted: await _granted(ph.Permission.ignoreBatteryOptimizations),
+      exactAlarmsGranted: await _granted(ph.Permission.scheduleExactAlarm),
       manufacturer: await _readManufacturer(),
     );
   }
@@ -102,6 +112,15 @@ class PlatformReadinessService implements DeviceReadinessService {
       // The system "Let app always run in background?" dialog. Needs
       // REQUEST_IGNORE_BATTERY_OPTIMIZATIONS in the manifest.
       await ph.Permission.ignoreBatteryOptimizations.request().timeout(const Duration(seconds: 60));
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> requestExactAlarms() async {
+    try {
+      // Opens the system "Alarms & reminders" page for this app on Android 12;
+      // a plain grant elsewhere.
+      await ph.Permission.scheduleExactAlarm.request().timeout(const Duration(seconds: 60));
     } catch (_) {}
   }
 

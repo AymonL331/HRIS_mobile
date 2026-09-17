@@ -8,6 +8,7 @@ import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/page_header.dart';
 import '../tracking/background_running_tile.dart';
+import 'clock_reminders_tile.dart';
 
 /// Who is signed in, where the app is pointed, and the version.
 ///
@@ -117,8 +118,9 @@ class SettingsScreen extends StatelessWidget {
         ]),
         // Whether this phone will let the app keep recording during a shift —
         // always visible, so a phone can be checked before it causes a gap.
+        // And whether it will deliver the clock-in / clock-out reminders.
         const SectionLabel('Phone'),
-        group([const BackgroundRunningTile()]),
+        group([const BackgroundRunningTile(), const ClockRemindersTile()]),
         const SectionLabel('About'),
         group([
           ListTile(

@@ -7,6 +7,7 @@ import '../../core/location/location_fix.dart';
 import '../../core/time/server_clock.dart';
 import '../face/face_capture_screen.dart';
 import '../face/face_models.dart';
+import '../reminders/reminder_coordinator.dart';
 import '../tracking/tracking_models.dart';
 import '../tracking/tracking_service.dart';
 import 'clock_api.dart';
@@ -64,6 +65,11 @@ class TimeClockController extends ChangeNotifier {
   /// widget test that is not about tracking).
   final TrackingService? tracking;
 
+  /// The clock-in / clock-out reminder alarms, re-planned after every status
+  /// load (a clock-in cancels today's clock-in ladder). Null in tests that are
+  /// not about reminders.
+  final ReminderSync? reminders;
+
   bool _loading = false;
   String? _loadError;
   ClockStatus? _status;
@@ -74,7 +80,7 @@ class TimeClockController extends ChangeNotifier {
   bool _consentSaving = false;
   bool _disposed = false;
 
-  TimeClockController({required this.api, required this.fixes, ServerClock? clock, this.tracking})
+  TimeClockController({required this.api, required this.fixes, ServerClock? clock, this.tracking, this.reminders})
       : clock = clock ?? ServerClock();
 
   bool get loading => _loading;
@@ -111,6 +117,7 @@ class TimeClockController extends ChangeNotifier {
       clock.sync(s.serverTime);
       _loadError = null;
       _syncTracking(s.tracking);
+      _syncReminders(s);
     } on ApiException catch (e) {
       _loadError = e.message;
     } finally {
@@ -128,6 +135,14 @@ class TimeClockController extends ChangeNotifier {
     final t = tracking;
     if (t == null) return;
     unawaited(t.sync(state));
+  }
+
+  /// Same shape as tracking: the status is the truth, the alarms follow it.
+  /// Not awaited — it may fetch the schedule, and the screen must not wait.
+  void _syncReminders(ClockStatus status) {
+    final r = reminders;
+    if (r == null) return;
+    unawaited(r.onStatus(status));
   }
 
   /// The pre-punch "am I in range?" reading. Never sent anywhere.

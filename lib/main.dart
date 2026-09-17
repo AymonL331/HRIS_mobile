@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -17,6 +18,12 @@ import 'features/app_update/app_update_controller.dart';
 import 'features/app_update/app_update_models.dart';
 import 'features/attendance/attendance_api.dart';
 import 'features/payslips/payslip_api.dart';
+import 'features/reminders/reminder_coordinator.dart';
+import 'features/reminders/reminder_notifier.dart';
+import 'features/reminders/reminder_scheduler.dart';
+import 'features/reminders/reminder_store.dart';
+import 'features/reminders/reminder_tap_relay.dart';
+import 'features/reminders/reminders_api.dart';
 import 'features/time_clock/clock_api.dart';
 import 'features/tracking/tracking_service.dart';
 
@@ -49,9 +56,35 @@ Future<void> main() async {
   // recording; an offline cold start that merely shows the login screen does not.
   FlutterForegroundTask.initCommunicationPort();
   final tracking = ForegroundTrackingService(session);
+
+  // Clock-in / clock-out reminders (2026-09-17): the alarms that wake the phone
+  // at HR's reminder times, the notification they show, and the relay a tap
+  // lands on. The alarm manager must be initialised before an alarm is armed;
+  // the notifier before anything is shown — both once, here.
+  final reminderStore = PrefsReminderStore();
+  final reminderTaps = ReminderTapRelay();
+  final reminderNotifier = LocalReminderNotifier(store: reminderStore);
+  final reminders = ReminderCoordinator(
+    session: session,
+    store: reminderStore,
+    scheduler: ReminderScheduler(
+      store: reminderStore,
+      alarms: const AndroidAlarmPort(),
+      api: MobileReminderScheduleApi(session),
+    ),
+  );
+  try {
+    await AndroidAlarmManager.initialize();
+  } catch (_) {
+    // A host with no alarm manager (tests, odd devices): the bell still works.
+  }
+  await reminderNotifier.initialize(onTap: (payload) => reminderTaps.value = payload);
+
   session.addListener(() {
     if (session.state is SignedOut && !session.hasStoredSession) {
       unawaited(tracking.stop(reason: 'signed_out'));
+      // Nothing may fire for an account that is gone.
+      unawaited(reminders.clear());
     }
   });
 
@@ -74,6 +107,12 @@ Future<void> main() async {
         Provider<ClockApi?>.value(value: null),
         Provider<AttendanceApi?>.value(value: null),
         Provider<PayslipApi?>.value(value: null),
+        Provider<NotificationsApi?>.value(value: null),
+        // The reminders, as the shell, the Time Clock and Settings read them.
+        Provider<ReminderSync?>.value(value: reminders),
+        Provider<ReminderCoordinator?>.value(value: reminders),
+        Provider<ReminderNotifier?>.value(value: reminderNotifier),
+        ChangeNotifierProvider<ReminderTapRelay>.value(value: reminderTaps),
       ],
       child: const HrisApp(),
     ),

@@ -35,6 +35,9 @@ class _Device implements DeviceReadinessService {
     requests += 1;
     unrestricted = true; // the user allowed it in the system dialog
   }
+
+  @override
+  Future<void> requestExactAlarms() async {}
   @override
   Future<void> openAppSettings() async {
     settingsOpened += 1;

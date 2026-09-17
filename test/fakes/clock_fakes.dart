@@ -191,6 +191,8 @@ class AlwaysReadyDevice implements DeviceReadinessService {
   @override
   Future<void> requestBatteryExemption() async {}
   @override
+  Future<void> requestExactAlarms() async {}
+  @override
   Future<void> openAppSettings() async {}
   @override
   Future<Set<String>> skippedSteps() async => const {};
