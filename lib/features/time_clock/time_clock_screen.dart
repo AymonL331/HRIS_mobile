@@ -301,7 +301,7 @@ class _Header extends StatelessWidget {
           ),
           const SizedBox(height: HrisSpace.s4),
           Text(
-            ManilaTime.timeWithSeconds(nowUtc),
+            ManilaTime.time(nowUtc),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: HrisType.stat,
