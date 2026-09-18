@@ -19,20 +19,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../fakes/clock_fakes.dart';
 import '../fakes/reminder_fakes.dart';
 
-/// A phone that has refused exact alarms until asked.
+/// An Android 12 phone whose "Alarms & reminders" switch is off.
 class _NoExactAlarms extends AlwaysReadyDevice {
-  int requests = 0;
-  bool granted = false;
+  final String manufacturer;
+  _NoExactAlarms(this.manufacturer);
 
   @override
-  Future<DeviceReadiness> check() async =>
-      DeviceReadiness(notificationsGranted: true, batteryUnrestricted: true, exactAlarmsGranted: granted);
-
-  @override
-  Future<void> requestExactAlarms() async {
-    requests++;
-    granted = true;
-  }
+  Future<DeviceReadiness> check() async => DeviceReadiness(
+        notificationsGranted: true,
+        batteryUnrestricted: true,
+        exactAlarmsGranted: false,
+        manufacturer: manufacturer,
+      );
 }
 
 void main() {
@@ -162,7 +160,7 @@ void main() {
       expect(store.armedAlarms.length, 5);
     });
 
-    testWidgets('exact alarms refused → Needs attention with the one-tap fix', (tester) async {
+    Future<void> pumpTile(WidgetTester tester, DeviceReadinessService device) async {
       SharedPreferences.setMockInitialValues({});
       final env = EnvStore();
       await env.load();
@@ -173,7 +171,6 @@ void main() {
         store: store,
         scheduler: ReminderScheduler(store: store, alarms: FakeAlarmPort(), api: FakeReminderScheduleApi()),
       );
-      final device = _NoExactAlarms();
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -184,11 +181,29 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+    }
+
+    testWidgets('exact alarms off → Needs attention with the brand\'s steps, and NO button (no dialog can set it)', (tester) async {
+      await pumpTile(tester, _NoExactAlarms('samsung'));
       expect(find.text('Needs attention'), findsOneWidget);
       expect(find.textContaining('Exact alarms are off'), findsOneWidget);
-      await tester.tap(find.text('Allow exact alarms'));
-      await tester.pumpAndSettle();
-      expect(device.requests, 1);
+      expect(find.text('To allow exact alarms on your Samsung phone:'), findsOneWidget);
+      expect(find.textContaining('Special access › Alarms and reminders'), findsOneWidget);
+      expect(find.textContaining('Find HRIS in the list'), findsOneWidget);
+      expect(find.text('Allow exact alarms'), findsNothing);
+      expect(find.byType(OutlinedButton), findsNothing);
+    });
+
+    testWidgets('a brand whose menus move between versions gets Settings search, not a guessed path', (tester) async {
+      await pumpTile(tester, _NoExactAlarms('HONOR'));
+      expect(find.text('To allow exact alarms on your HUAWEI / HONOR phone:'), findsOneWidget);
+      expect(find.textContaining('type "alarms"'), findsOneWidget);
+      expect(find.textContaining('Special access'), findsNothing);
+    });
+
+    testWidgets('exact alarms allowed (every Android 13+ phone) → no steps at all', (tester) async {
+      await pumpTile(tester, AlwaysReadyDevice());
+      expect(find.textContaining('To allow exact alarms'), findsNothing);
       expect(find.text('Needs attention'), findsNothing);
     });
   });

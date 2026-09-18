@@ -1,5 +1,6 @@
 package com.suertemotoplaza.hris
 
+import android.app.AlarmManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -52,6 +53,20 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                else -> result.notImplemented()
+            }
+        }
+        // CLOCK REMINDERS (2026-09-18): may this app set EXACT alarms right now?
+        // Asked of AlarmManager itself, because a permission plugin reads it off
+        // the manifest's SCHEDULE_EXACT_ALARM entry — which this app declares for
+        // Android 12 only; 13+ runs on USE_EXACT_ALARM, granted at install, and
+        // the plugin reported that as "denied".
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "hris/alarms").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "canScheduleExact" -> result.success(
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                        (getSystemService(ALARM_SERVICE) as AlarmManager).canScheduleExactAlarms()
+                )
                 else -> result.notImplemented()
             }
         }

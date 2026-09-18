@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/device/device_readiness_service.dart';
+import '../../core/device/oem_hints.dart';
 import '../../core/time/manila_time.dart';
 import '../../shared/tokens.dart';
 import '../reminders/reminder_coordinator.dart';
@@ -121,28 +122,52 @@ class _ClockRemindersTileState extends State<ClockRemindersTile> with WidgetsBin
           subtitle: Text(detail),
           trailing: Text(status, style: TextStyle(fontSize: HrisType.xs, fontWeight: HrisType.semibold, color: colour)),
         ),
-        if (blocked)
+        if (noNotifications)
           Padding(
             padding: const EdgeInsets.fromLTRB(HrisSpace.s4, 0, HrisSpace.s4, HrisSpace.s3),
-            child: Wrap(
-              spacing: HrisSpace.s2,
-              runSpacing: HrisSpace.s2,
-              children: [
-                if (noNotifications)
-                  OutlinedButton.icon(
-                    onPressed: () => _fix(_device?.requestNotifications),
-                    icon: const Icon(Icons.notifications_outlined),
-                    label: const Text('Allow notifications'),
-                  ),
-                if (noExactAlarms)
-                  OutlinedButton.icon(
-                    onPressed: () => _fix(_device?.requestExactAlarms),
-                    icon: const Icon(Icons.alarm_on_outlined),
-                    label: const Text('Allow exact alarms'),
-                  ),
-              ],
+            child: OutlinedButton.icon(
+              onPressed: () => _fix(_device?.requestNotifications),
+              icon: const Icon(Icons.notifications_outlined),
+              label: const Text('Allow notifications'),
             ),
           ),
+        // Steps, not a button: no dialog can set this switch (2026-09-18 — the
+        // button that tried did nothing). Re-checked on return to the app.
+        if (noExactAlarms)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(HrisSpace.s4, 0, HrisSpace.s4, HrisSpace.s3),
+            child: _ExactAlarmSteps(hint: oemExactAlarmHint(_readiness?.manufacturer ?? ''), color: t.muted),
+          ),
+      ],
+    );
+  }
+}
+
+class _ExactAlarmSteps extends StatelessWidget {
+  final OemHint hint;
+  final Color color;
+
+  const _ExactAlarmSteps({required this.hint, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    const style = TextStyle(fontSize: 12, height: 1.45);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'To allow exact alarms on ${hint.brand == 'this' ? 'this' : 'your ${hint.brand}'} phone:',
+          style: style.copyWith(fontWeight: FontWeight.w600, color: color),
+        ),
+        for (var i = 0; i < hint.steps.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text('${i + 1}. ${hint.steps[i]}', style: style.copyWith(color: color)),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(top: HrisSpace.s1),
+          child: Text('Then come back to HRIS — this row updates by itself.', style: style.copyWith(color: color)),
+        ),
       ],
     );
   }

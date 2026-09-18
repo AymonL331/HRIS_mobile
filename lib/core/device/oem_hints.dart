@@ -66,3 +66,49 @@ OemHint? oemBatteryHint(String manufacturer) {
   }
   return null;
 }
+
+/// Where to allow EXACT ALARMS — the clock reminders' "Alarms & reminders"
+/// switch, which only Android 12 leaves to the user (13+ grants it to this app
+/// at install) and which no dialog can set (2026-09-18: the button that tried
+/// did nothing).
+///
+/// ACCURACY OVER DETAIL. A menu path is given only where it is the same on
+/// every phone of that brand running Android 12 — stock Android and Samsung
+/// One UI 4. The other skins move the page between versions, so for them the
+/// step is Settings' own SEARCH, which finds it on every skin; a guessed path
+/// that turns out wrong is worse than none. Never null: every phone gets the
+/// search step at least.
+OemHint oemExactAlarmHint(String manufacturer) {
+  final m = manufacturer.toLowerCase().trim();
+  bool any(List<String> names) => names.any(m.contains);
+  const search =
+      'Open Settings, tap the search bar at the top, type "alarms" and open "Alarms & reminders" (on some phones "Alarms and reminders" or "Set alarms and reminders").';
+  const allow = 'Find HRIS in the list and turn the switch ON.';
+
+  if (any(const ['samsung'])) {
+    return const OemHint('Samsung', [
+      'Settings › Apps › tap ⋮ (top right) › Special access › Alarms and reminders.',
+      allow,
+      'Can\'t find it? $search',
+    ]);
+  }
+  if (any(const ['google', 'motorola', 'nokia', 'hmd'])) {
+    return const OemHint('this', [
+      'Settings › Apps › Special app access › Alarms & reminders.',
+      allow,
+      'Can\'t find it? $search',
+    ]);
+  }
+  final brand = any(const ['xiaomi', 'redmi', 'poco'])
+      ? 'Xiaomi / Redmi / POCO'
+      : any(const ['oppo', 'realme', 'oneplus'])
+          ? 'OPPO / realme / OnePlus'
+          : any(const ['vivo', 'iqoo'])
+              ? 'vivo'
+              : any(const ['huawei', 'honor'])
+                  ? 'HUAWEI / HONOR'
+                  : any(const ['infinix', 'tecno', 'itel'])
+                      ? 'Infinix / TECNO / itel'
+                      : 'this';
+  return OemHint(brand, const [search, allow]);
+}

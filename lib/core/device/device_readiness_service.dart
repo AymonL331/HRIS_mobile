@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 // Prefixed for the same reason as the location gate service: permission_handler
 // and geolocator both export a `ServiceStatus`.
 import 'package:permission_handler/permission_handler.dart' as ph;
@@ -16,8 +17,10 @@ class DeviceReadiness {
   final bool batteryUnrestricted;
 
   /// EXACT alarms (the clock-in / clock-out reminders, 2026-09-17). Android 13+
-  /// grants them to the app outright (USE_EXACT_ALARM); Android 12 asks, from
-  /// a Settings page rather than a dialog; older versions never ask.
+  /// grants them to the app outright (USE_EXACT_ALARM); Android 12 leaves it to
+  /// a switch on the "Alarms & reminders" page, which no dialog can set — the
+  /// app can only say where it is (see `oemExactAlarmHint`); older versions
+  /// never ask.
   final bool exactAlarmsGranted;
 
   /// `Build.MANUFACTURER`, lower-cased; '' when unknown.
@@ -41,9 +44,6 @@ abstract class DeviceReadinessService {
 
   Future<void> requestBatteryExemption();
 
-  /// Android 12's "Alarms & reminders" page for this app; a no-op elsewhere.
-  Future<void> requestExactAlarms();
-
   Future<void> openAppSettings();
 
   /// Optional setup steps the employee chose to skip, by step name. Persisted,
@@ -65,7 +65,7 @@ class PlatformReadinessService implements DeviceReadinessService {
     return DeviceReadiness(
       notificationsGranted: await _granted(ph.Permission.notification),
       batteryUnrestricted: await _granted(ph.Permission.ignoreBatteryOptimizations),
-      exactAlarmsGranted: await _granted(ph.Permission.scheduleExactAlarm),
+      exactAlarmsGranted: await _canScheduleExact(),
       manufacturer: await _readManufacturer(),
     );
   }
@@ -77,6 +77,21 @@ class PlatformReadinessService implements DeviceReadinessService {
     } catch (_) {
       // A host with no plugin, or a channel that refuses: these steps are
       // optional, so an unreadable state must never block the app.
+      return true;
+    }
+  }
+
+  static const _alarms = MethodChannel('hris/alarms');
+
+  /// AlarmManager's own answer (MainActivity) — NOT permission_handler's
+  /// `scheduleExactAlarm`, which reads the manifest's SCHEDULE_EXACT_ALARM entry
+  /// and so reported "denied" on every Android 13+ phone, where this app runs on
+  /// USE_EXACT_ALARM instead (a HONOR, 2026-09-18). Unknown counts as fine.
+  Future<bool> _canScheduleExact() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return true;
+    try {
+      return await _alarms.invokeMethod<bool>('canScheduleExact').timeout(const Duration(seconds: 5)) ?? true;
+    } catch (_) {
       return true;
     }
   }
@@ -112,15 +127,6 @@ class PlatformReadinessService implements DeviceReadinessService {
       // The system "Let app always run in background?" dialog. Needs
       // REQUEST_IGNORE_BATTERY_OPTIMIZATIONS in the manifest.
       await ph.Permission.ignoreBatteryOptimizations.request().timeout(const Duration(seconds: 60));
-    } catch (_) {}
-  }
-
-  @override
-  Future<void> requestExactAlarms() async {
-    try {
-      // Opens the system "Alarms & reminders" page for this app on Android 12;
-      // a plain grant elsewhere.
-      await ph.Permission.scheduleExactAlarm.request().timeout(const Duration(seconds: 60));
     } catch (_) {}
   }
 

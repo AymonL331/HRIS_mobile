@@ -37,8 +37,6 @@ class _Device implements DeviceReadinessService {
   }
 
   @override
-  Future<void> requestExactAlarms() async {}
-  @override
   Future<void> openAppSettings() async {
     settingsOpened += 1;
   }
