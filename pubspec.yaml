@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.9.5+27
+version: 1.9.6+28
 
 environment:
   sdk: ^3.13.3
@@ -133,13 +133,13 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
 # Launcher icon from the HRIS brand artwork (tool/brand/make_icons.ps1 builds the
-# sources from assets/brand/hris-icon-*-1024.png). Adaptive: white background (the
-# light artwork's own ground), the mark as foreground, and the person + lines alone
-# as the monochrome (themed icons, Android 13+).
+# sources from assets/brand/hris-icon-*-1024.png). Adaptive, full-bleed (no white
+# ground): the card's navy gradient as background, the person + lines as foreground,
+# and the same in white as the monochrome (themed icons, Android 13+).
 flutter_launcher_icons:
   android: true
   ios: false
   image_path: assets/brand/icon_legacy.png
-  adaptive_icon_background: "#ffffff"
+  adaptive_icon_background: assets/brand/icon_background.png
   adaptive_icon_foreground: assets/brand/icon_foreground.png
   adaptive_icon_monochrome: assets/brand/icon_monochrome.png
