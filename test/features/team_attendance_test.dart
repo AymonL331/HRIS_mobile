@@ -146,7 +146,7 @@ void main() {
       expect(find.text('Late'), findsOneWidget);
       expect(find.text('Absent'), findsOneWidget);
       expect(find.text('No record'), findsOneWidget);
-      expect(find.text('Late 90 min'), findsOneWidget);
+      expect(find.text('Late 1h 30m'), findsOneWidget);
       expect(find.text('Mobile app'), findsOneWidget);
       expect(find.text('Out of range'), findsOneWidget);
       expect(find.textContaining('In: Arnaiz Avenue, Makati'), findsOneWidget);

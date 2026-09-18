@@ -46,9 +46,9 @@ void main() {
     expect(find.text('Sofia Sandbox'), findsOneWidget);
     expect(find.text('EMP01670'), findsOneWidget);
     expect(find.text('Server time (Manila)'), findsOneWidget);
-    // Hours and minutes only — the fixture's 00:12:33Z is 8:12 AM in Manila.
-    expect(find.text('8:12 AM'), findsOneWidget);
-    expect(find.textContaining(RegExp(r'\d:\d\d:\d\d')), findsNothing);
+    // The server clock keeps its seconds (user, 2026-09-18) — the fixture's
+    // 00:12:33Z reads 8:12:3x AM in Manila as the test runs.
+    expect(find.textContaining(RegExp(r'^8:12:\d\d AM$')), findsOneWidget);
     expect(find.textContaining('Allowed radius 200 m around Head Office'), findsOneWidget);
     expect(button(tester, 'Time In').onPressed, isNotNull);
     expect(button(tester, 'Time Out').onPressed, isNull);

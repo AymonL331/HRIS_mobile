@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/time/duration_label.dart';
 import '../../core/time/manila_time.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
@@ -264,8 +265,8 @@ class _PersonTile extends StatelessWidget {
         : '${day.clockInAt == null ? '—' : ManilaTime.time(day.clockInAt!)}  →  ${day.clockOutAt == null ? '—' : ManilaTime.time(day.clockOutAt!)}';
 
     final chips = <(String, StatusTone)>[
-      if (day.isLate && day.lateMinutes > 0) ('Late ${day.lateMinutes} min', StatusTone.warning),
-      if (day.isUndertime && day.undertimeMinutes > 0) ('Undertime ${day.undertimeMinutes} min', StatusTone.warning),
+      if (day.isLate && day.lateMinutes > 0) ('Late ${hoursMinutes(day.lateMinutes)}', StatusTone.warning),
+      if (day.isUndertime && day.undertimeMinutes > 0) ('Undertime ${hoursMinutes(day.undertimeMinutes)}', StatusTone.warning),
       if (day.isHalfDay) ('Half day', StatusTone.info),
       if (day.leaveTypeName != null)
         ('${day.leaveTypeName}${day.leaveDayPart != null && day.leaveDayPart != 'full' ? ' (${day.leaveDayPart!.toUpperCase()})' : ''}', StatusTone.success),

@@ -98,7 +98,7 @@ void main() {
     expect(find.text('September 2026'), findsOneWidget);
     expect(find.text('1 worked · 1 late · 1 absent · 1 on leave'), findsOneWidget);
     expect(find.text('Late'), findsOneWidget);
-    expect(find.text('Late 36 min'), findsOneWidget);
+    expect(find.text('Late 36m'), findsOneWidget);
     expect(find.text('8:36 AM  →  5:00 PM'), findsOneWidget);
     expect(find.text('Mobile app'), findsOneWidget);
     expect(find.text('Absent'), findsOneWidget);

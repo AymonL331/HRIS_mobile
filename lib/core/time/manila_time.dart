@@ -18,6 +18,7 @@ abstract final class ManilaTime {
   }
 
   static String time(DateTime utc) => DateFormat('h:mm a').format(toManila(utc));
+  static String timeWithSeconds(DateTime utc) => DateFormat('h:mm:ss a').format(toManila(utc));
   static String dateTime(DateTime utc) => DateFormat('EEE, d MMM yyyy · h:mm a').format(toManila(utc));
   static String clock(DateTime utc) => DateFormat('EEEE, d MMMM yyyy').format(toManila(utc));
 

@@ -1,3 +1,4 @@
+import '../../core/time/duration_label.dart';
 import '../../core/time/manila_time.dart';
 
 int _int(Object? v) => v == null ? 0 : (v is int ? v : int.tryParse('$v') ?? 0);
@@ -117,12 +118,7 @@ class TeamDay {
   bool get isMobilePunch => captureMethod == 'mobile' || clockInMethod == 'mobile' || clockOutMethod == 'mobile';
   bool get outOfRange => inWithin == false || outWithin == false;
 
-  String get workedLabel {
-    if (workedMinutes <= 0) return '';
-    final h = workedMinutes ~/ 60;
-    final m = workedMinutes % 60;
-    return h > 0 ? '${h}h ${m.toString().padLeft(2, '0')}m' : '${m}m';
-  }
+  String get workedLabel => workedMinutes <= 0 ? '' : hoursMinutes(workedMinutes);
 }
 
 /// One page of the team DTR for a date, plus what the header counts.
