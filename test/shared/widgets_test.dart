@@ -63,6 +63,18 @@ void main() {
       expect(tester.widget<Text>(find.text('HRIS')).style!.fontSize, HrisType.xl);
     });
 
+    testWidgets('the mark sits LEFT of the word, and follows the theme (light / dark artwork)', (tester) async {
+      String asset() => (tester.widget<Image>(find.byType(Image)).image as AssetImage).assetName;
+      await mount(tester, const BrandMark());
+      expect(asset(), BrandMark.lightAsset);
+      expect(tester.getTopLeft(find.byType(Image)).dx, lessThan(tester.getTopLeft(find.text('HRIS')).dx));
+      expect(tester.getSize(find.byType(Image)), const Size(HrisSize.brandMark, HrisSize.brandMark));
+      await mount(tester, const BrandMark(size: BrandMarkSize.auth), brightness: Brightness.dark);
+      await tester.pumpAndSettle(); // the theme change animates; read the settled theme
+      expect(asset(), BrandMark.darkAsset);
+      expect(tester.getSize(find.byType(Image)), const Size(HrisSize.brandMarkAuth, HrisSize.brandMarkAuth));
+    });
+
     testWidgets('the avatar shows the upper-cased first initial, ? when empty', (tester) async {
       await mount(tester, const UserAvatar('olive'));
       expect(find.text('O'), findsOneWidget);

@@ -205,5 +205,6 @@ abstract final class HrisType {
 abstract final class HrisSize {
   static const topBar = 60.0; // --header-height
   static const avatar = 32.0; // the top-bar avatar
-  static const brandDot = 10.0; // .brandDot
+  static const brandMark = 40.0; // the mark beside "HRIS" in the 60px top bar
+  static const brandMarkAuth = 72.0; // the login / splash mark
 }

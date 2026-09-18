@@ -74,7 +74,7 @@ class LocalReminderNotifier implements ReminderNotifier {
   Future<void> initialize({void Function(String? payload)? onTap}) async {
     try {
       await plugin.initialize(
-        settings: const InitializationSettings(android: AndroidInitializationSettings('ic_launcher_monochrome')),
+        settings: const InitializationSettings(android: AndroidInitializationSettings('ic_stat_hris')),
         onDidReceiveNotificationResponse: onTap == null ? null : (r) => onTap(r.payload),
       );
       final android = plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();

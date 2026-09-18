@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The splash: the web page colour with the brand dot centred, shown until
-     Flutter draws its first frame (the Dart SplashScreen then takes over). -->
+<!-- The splash: the web page colour with the HRIS mark centred, shown until
+     Flutter draws its first frame (the Dart SplashScreen then takes over).
+     splash_logo is the light artwork, or the dark one in dark mode
+     (drawable-night-nodpi) — tool/brand/make_icons.ps1 writes both. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_bg" />
-    <item android:gravity="center" android:width="48dp" android:height="48dp">
-        <shape android:shape="oval">
-            <solid android:color="@color/splash_dot" />
-        </shape>
-    </item>
+    <item android:gravity="center" android:width="96dp" android:height="96dp"
+        android:drawable="@drawable/splash_logo" />
 </layer-list>
