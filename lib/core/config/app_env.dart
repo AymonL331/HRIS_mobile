@@ -29,9 +29,16 @@ class EnvConfig {
     'HRIS_MAIN_URL',
     defaultValue: 'http://192.168.137.1:5000',
   );
+  /// Tailscale Funnel on the development PC (2026-09-22). PERMANENT, unlike the
+  /// ngrok / Cloudflare quick tunnels it replaces: the host is this machine's
+  /// name inside the tailnet, so a tester's APK keeps working across reboots and
+  /// tunnel restarts and nobody retypes a URL under Advanced. The PC must be on
+  /// with `tailscale funnel` set. Override at build time with
+  /// --dart-define=HRIS_SANDBOX_URL=... (the Android emulator uses
+  /// http://10.0.2.2:5001 and needs no tunnel at all).
   static const defaultSandboxUrl = String.fromEnvironment(
     'HRIS_SANDBOX_URL',
-    defaultValue: 'https://turbine-chamomile-financial.ngrok-free.dev',
+    defaultValue: 'https://desktop-eg1b53e.tail797ea0.ts.net',
   );
   final AppEnv selected;
   final String mainUrl;

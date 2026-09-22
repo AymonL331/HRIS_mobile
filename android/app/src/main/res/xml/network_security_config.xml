@@ -11,6 +11,19 @@
         <domain includeSubdomains="false">192.168.137.1</domain>
     </domain-config>
     <!--
+      THE ANDROID EMULATOR's alias for the host PC. 10.0.2.2 is a fiction the
+      emulator invents - it is not routable from a real device and cannot leave
+      the developer's machine - so permitting cleartext to it exposes nothing,
+      and it lets the emulator reach the sandbox API (:5001) straight from the
+      host without a public tunnel, its bandwidth or its DNS. The same class of
+      dev-only entry as the hotspot address above; drop it if the emulator ever
+      stops being part of the workflow. (2026-09-22: added because app_env.dart
+      already told people to use this address and the config refused it.)
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+    <!--
       LOOPBACK, for the face capture only. The app serves the bundled capture
       page and its model weights from an ephemeral port on 127.0.0.1 so the
       WebView gets a secure context for getUserMedia and can fetch() the weights
