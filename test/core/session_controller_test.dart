@@ -176,7 +176,7 @@ void main() {
     expect(s.state, isA<SignedOut>());
     expect(await store.read('main'), isNull);
     await s.login(companyCode: 'c', identifier: 'u', password: 'p');
-    expect(urls.last, 'https://turbine-chamomile-financial.ngrok-free.dev');
+    expect(urls.last, EnvConfig.defaultSandboxUrl);
     expect((await store.read('sandbox'))!.token, 'T');
   });
 }

@@ -5,12 +5,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('EnvConfig', () {
-    test('defaults point Main at the hotspot and Sandbox at ngrok', () {
+    test('defaults point Main at the hotspot and Sandbox at the Tailscale Funnel', () {
       const c = EnvConfig.defaults();
       expect(c.selected, AppEnv.main);
       expect(c.baseUrl, 'http://192.168.137.1:5000');
-      expect(c.copyWith(selected: AppEnv.sandbox).baseUrl, 'https://turbine-chamomile-financial.ngrok-free.dev');
+      // Permanent (this PC's name in the tailnet) — the reason it may be baked in.
+      expect(c.copyWith(selected: AppEnv.sandbox).baseUrl, 'https://desktop-eg1b53e.tail797ea0.ts.net');
       expect(AppEnv.values, [AppEnv.main, AppEnv.sandbox]);
+    });
+
+    test('the dead ngrok host is a RETIRED default, and the current default never is', () {
+      expect(EnvConfig.retiredSandboxUrls, contains('https://turbine-chamomile-financial.ngrok-free.dev'));
+      expect(EnvConfig.retiredSandboxUrls, isNot(contains(EnvConfig.defaultSandboxUrl)));
     });
 
     test('storageKey is per environment', () {
@@ -55,6 +61,29 @@ void main() {
       expect(store.config.sandboxUrl, EnvConfig.defaultSandboxUrl);
     });
 
+    test('a stored sandbox override that is a RETIRED default is ignored and cleared', () async {
+      // The trap this closes (2026-09-22): a phone that once pressed Save in
+      // Advanced had the then-default ngrok host pinned in storage, and it
+      // outlived the upgrade to a build whose default had moved on.
+      SharedPreferences.setMockInitialValues({
+        'env.sandboxUrl': 'https://turbine-chamomile-financial.ngrok-free.dev',
+        'env.mainUrl': 'https://kept.example.com',
+      });
+      final store = EnvStore();
+      await store.load();
+      expect(store.config.sandboxUrl, EnvConfig.defaultSandboxUrl, reason: 'the dead host must not win');
+      expect(store.config.mainUrl, 'https://kept.example.com', reason: 'an unrelated override is untouched');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('env.sandboxUrl'), isNull, reason: 'cleared, so this never has to run again');
+    });
+
+    test('a stored sandbox override that is NOT retired still wins over the default', () async {
+      SharedPreferences.setMockInitialValues({'env.sandboxUrl': 'http://10.0.2.2:5001'});
+      final store = EnvStore();
+      await store.load();
+      expect(store.config.sandboxUrl, 'http://10.0.2.2:5001');
+    });
+
     test('a corrupt stored URL falls back to the default', () async {
       SharedPreferences.setMockInitialValues({'env.mainUrl': 'not a url'});
       final store = EnvStore();
@@ -90,6 +119,22 @@ void main() {
       expect(store.config.isDefaultUrls, isTrue);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('env.mainUrl'), isNull);
+    });
+
+    test('Save with a field left at the compiled default does NOT pin it', () async {
+      // Otherwise pressing Save without changes froze THIS build's default into
+      // storage, where it outlived every later build.
+      SharedPreferences.setMockInitialValues({});
+      final store = EnvStore();
+      await store.load();
+      await store.setUrls(mainUrl: EnvConfig.defaultMainUrl, sandboxUrl: 'https://custom.test');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('env.mainUrl'), isNull, reason: 'unchanged field keeps tracking the shipped default');
+      expect(prefs.getString('env.sandboxUrl'), 'https://custom.test');
+      // Saving the changed field back to the default un-pins it too.
+      await store.setUrls(mainUrl: EnvConfig.defaultMainUrl, sandboxUrl: EnvConfig.defaultSandboxUrl);
+      expect(prefs.getString('env.sandboxUrl'), isNull);
+      expect(store.config.isDefaultUrls, isTrue);
     });
   });
 }

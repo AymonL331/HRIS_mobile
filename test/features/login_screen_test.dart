@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hris_mobile/core/config/app_env.dart';
 import 'package:hris_mobile/app.dart';
 import 'package:hris_mobile/core/auth/session_controller.dart';
 import 'package:hris_mobile/core/auth/session_store.dart';
@@ -106,10 +107,10 @@ void main() {
     expect(find.text('http://192.168.137.1:5000'), findsOneWidget);
     await tester.tap(find.text('Sandbox'));
     await tester.pumpAndSettle();
-    expect(find.text('https://turbine-chamomile-financial.ngrok-free.dev'), findsOneWidget);
+    expect(find.text(EnvConfig.defaultSandboxUrl), findsOneWidget);
     await fillAndSubmit(tester);
     expect(b.seen.first.url.path, '/api/auth/login');
-    expect(b.seen.first.url.origin, 'https://turbine-chamomile-financial.ngrok-free.dev');
+    expect(b.seen.first.url.origin, EnvConfig.defaultSandboxUrl);
     expect(b.session.isSignedIn, isTrue);
     await tester.pumpWidget(const SizedBox()); // dispose the ticking shell
   });

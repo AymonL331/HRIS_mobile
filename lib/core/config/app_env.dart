@@ -40,6 +40,16 @@ class EnvConfig {
     'HRIS_SANDBOX_URL',
     defaultValue: 'https://desktop-eg1b53e.tail797ea0.ts.net',
   );
+
+  /// Sandbox addresses this app USED to ship as its default and that are now
+  /// dead. A stored override that matches one is ignored on load and cleared,
+  /// so a phone that once pressed Save in Advanced — pinning what was then the
+  /// default — is not stuck on a dead host after an upgrade (seen 2026-09-22:
+  /// the ngrok host survived the upgrade to 1.9.7 on a tester's phone). Append
+  /// here whenever a default is retired; never remove an entry.
+  static const retiredSandboxUrls = <String>[
+    'https://turbine-chamomile-financial.ngrok-free.dev',
+  ];
   final AppEnv selected;
   final String mainUrl;
   final String sandboxUrl;

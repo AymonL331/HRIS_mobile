@@ -25,10 +25,19 @@ class EnvStore extends ChangeNotifier {
     // A stored value the enum no longer has (e.g. the retired "emulator"
     // preset) parses to Main.
     final selected = AppEnv.parse(prefs.getString(_kSelected));
+    // A stored sandbox override that is one of the app's RETIRED defaults is a
+    // dead host pinned by an old Save, not a choice anyone made — drop it, and
+    // clear it so the check never runs again on this phone. The compiled
+    // default then applies, exactly as on a fresh install.
+    var storedSandbox = EnvConfig.normalizeUrl(prefs.getString(_kSandboxUrl) ?? '');
+    if (storedSandbox != null && EnvConfig.retiredSandboxUrls.contains(storedSandbox)) {
+      storedSandbox = null;
+      await prefs.remove(_kSandboxUrl);
+    }
     _config = EnvConfig(
       selected: selected,
       mainUrl: EnvConfig.normalizeUrl(prefs.getString(_kMainUrl) ?? '') ?? EnvConfig.defaultMainUrl,
-      sandboxUrl: EnvConfig.normalizeUrl(prefs.getString(_kSandboxUrl) ?? '') ?? EnvConfig.defaultSandboxUrl,
+      sandboxUrl: storedSandbox ?? EnvConfig.defaultSandboxUrl,
     );
     _loaded = true;
     notifyListeners();
@@ -52,8 +61,21 @@ class EnvStore extends ChangeNotifier {
     _config = _config.copyWith(mainUrl: main, sandboxUrl: sandbox);
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kMainUrl, main);
-    await prefs.setString(_kSandboxUrl, sandbox);
+    // Store a value only when it DIFFERS from the compiled default. Pressing
+    // Save without changing anything used to pin the default of THAT build
+    // into storage, where it outlived every later build — which is how a dead
+    // host followed testers through an upgrade. An unchanged field is left
+    // unstored, so it keeps tracking whatever the app ships with.
+    if (main == EnvConfig.defaultMainUrl) {
+      await prefs.remove(_kMainUrl);
+    } else {
+      await prefs.setString(_kMainUrl, main);
+    }
+    if (sandbox == EnvConfig.defaultSandboxUrl) {
+      await prefs.remove(_kSandboxUrl);
+    } else {
+      await prefs.setString(_kSandboxUrl, sandbox);
+    }
   }
 
   Future<void> resetUrls() async {
