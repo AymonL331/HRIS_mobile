@@ -11,6 +11,9 @@ Map<String, dynamic> payslipRow(
   String status = 'released',
   String? transactionDate = '2026-08-20',
   String netPay = '12480.50',
+  // Server 2026-09-25: the ACTIVE adjustments folded in. Null = an older server
+  // that does not send the column at all.
+  String? adjustedNetPay,
   Map<String, dynamic>? run = const {
     'id': 7,
     'name': null,
@@ -25,6 +28,7 @@ Map<String, dynamic> payslipRow(
       'status': status,
       'transaction_date': transactionDate,
       'net_pay': netPay,
+      'adjusted_net_pay': ?adjustedNetPay,
       'basic_pay': '13900.00',
       'total_earnings': '14120.00',
       'total_deductions': '1639.50',
@@ -41,8 +45,19 @@ Map<String, dynamic> payslipRow(
     };
 
 /// `GET /api/me/payslips/:id` → `{ payslip, items }`.
-Map<String, dynamic> payslipDetail(int id, {List<Map<String, dynamic>>? items, Map<String, dynamic>? payslip}) => {
+Map<String, dynamic> payslipDetail(
+  int id, {
+  List<Map<String, dynamic>>? items,
+  Map<String, dynamic>? payslip,
+  // `adjustments[]` (active only) + `totals`, server 2026-09-25. Left out
+  // entirely by default, as an older server would.
+  List<Map<String, dynamic>>? adjustments,
+  Map<String, dynamic>? totals,
+}) =>
+    {
       'payslip': payslip ?? payslipRow(id),
+      'adjustments': ?adjustments,
+      'totals': ?totals,
       'items': items ??
           [
             item(1, 'earning', 'Basic pay', '13900.00'),
@@ -56,6 +71,17 @@ Map<String, dynamic> payslipDetail(int id, {List<Map<String, dynamic>>? items, M
 
 Map<String, dynamic> item(int id, String category, String name, String amount, {int taxable = 0}) =>
     {'id': id, 'category': category, 'name': name, 'amount': amount, 'taxable': taxable};
+
+/// One ACTIVE adjustment as `GET /api/me/payslips/:id` lists it.
+Map<String, dynamic> adjustment(int id, String direction, String category, String label, String amount, {String? reason}) => {
+      'id': id,
+      'direction': direction,
+      'category': category,
+      'label': label,
+      'amount': amount,
+      'reason': reason,
+      'status': 'active',
+    };
 
 /// `GET /api/me/payslips/:id/breakdown`.
 Map<String, dynamic> breakdownPayload({

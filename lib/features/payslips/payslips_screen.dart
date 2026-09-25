@@ -223,10 +223,13 @@ class _PayslipTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  Money.format(payslip.netPay),
+                  Money.format(payslip.paidNet),
                   style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
                 ),
-                Text('Net pay', style: TextStyle(fontSize: HrisType.xxs, height: 1.4, color: t.muted)),
+                Text(
+                  payslip.isAdjusted ? 'Adjusted net' : 'Net pay',
+                  style: TextStyle(fontSize: HrisType.xxs, height: 1.4, color: t.muted),
+                ),
               ],
             ),
             Icon(Icons.chevron_right, size: 20, color: t.muted),

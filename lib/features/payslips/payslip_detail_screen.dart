@@ -97,17 +97,23 @@ class _PayslipBody extends StatelessWidget {
           ),
         ),
 
-        // The one figure people open a payslip for.
+        // The one figure people open a payslip for. A correction HR filed after
+        // finalizing moves it; the original stays readable under it, as on the web.
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionLabel('Net pay', padding: EdgeInsets.zero),
+              SectionLabel(payslip.isAdjusted ? 'Adjusted net pay' : 'Net pay', padding: EdgeInsets.zero),
               const SizedBox(height: HrisSpace.s1),
               Text(
-                Money.format(payslip.netPay),
+                Money.format(payslip.paidNet),
                 style: TextStyle(fontSize: HrisType.stat, fontWeight: HrisType.semibold, height: 1.15, color: t.text),
               ),
+              if (payslip.isAdjusted)
+                Text(
+                  'Originally ${Money.format(payslip.netPay)}',
+                  style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+                ),
             ],
           ),
         ),
@@ -163,6 +169,61 @@ class _PayslipBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: HrisSpace.s3),
+
+        // Corrections HR filed after this payslip was finalized. Only the
+        // active ones arrive; they are paid with the payslip and make up the
+        // adjusted net above.
+        if (payslip.adjustments.isNotEmpty) ...[
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Adjustments',
+                  style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+                ),
+                const SizedBox(height: HrisSpace.s1),
+                Text(
+                  'Corrections filed after this payslip was finalized. They are paid with it.',
+                  style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+                ),
+                const SizedBox(height: HrisSpace.s3),
+                for (final a in payslip.adjustments)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: HrisSpace.s1),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(a.label, style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.text)),
+                              Text(
+                                [payslipItemCategoryLabels[a.category] ?? a.category, if (a.reason != null && a.reason!.isNotEmpty) a.reason!].join(' · '),
+                                style: TextStyle(fontSize: HrisType.xxs, height: 1.4, color: t.muted),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: HrisSpace.s3),
+                        Text(
+                          '${a.isDeduction ? '−' : '+'}${Money.format(a.amount)}',
+                          style: TextStyle(
+                            fontSize: HrisType.sm,
+                            fontWeight: HrisType.semibold,
+                            height: 1.4,
+                            color: a.isDeduction ? t.danger.text : t.text,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: HrisSpace.s3),
+        ],
 
         AppCard(
           child: Column(

@@ -75,6 +75,11 @@ class PayslipSummary {
   final String? status;
   final String? transactionDate;
   final num netPay;
+
+  /// `net_pay` with the ACTIVE corrections HR filed after finalizing folded in
+  /// (server, 2026-09-25). Null from a server that predates it, so [paidNet]
+  /// falls back to the original and the screen never shows ₱0 by mistake.
+  final num? adjustedNetPay;
   final PayrollRunRef? run;
 
   const PayslipSummary({
@@ -82,15 +87,55 @@ class PayslipSummary {
     required this.status,
     required this.transactionDate,
     required this.netPay,
+    required this.adjustedNetPay,
     required this.run,
   });
+
+  /// What is actually paid — the figure a list row shows.
+  num get paidNet => adjustedNetPay ?? netPay;
+
+  /// True when an active correction moved the net, so the row can say so.
+  bool get isAdjusted => adjustedNetPay != null && adjustedNetPay != netPay;
 
   factory PayslipSummary.fromJson(Map<String, dynamic> j) => PayslipSummary(
         id: _id(j['id']) ?? 0,
         status: j['status'] as String?,
         transactionDate: j['transaction_date'] as String?,
         netPay: Money.asNum(j['net_pay']),
+        adjustedNetPay: Money.toNum(j['adjusted_net_pay']),
         run: PayrollRunRef.fromJson(j['run']),
+      );
+}
+
+/// One ACTIVE correction HR filed against a finalized payslip
+/// (`GET /api/me/payslips/:id` → `adjustments[]`). Void ones never reach the
+/// phone — the server drops them for the employee's own view.
+class PayslipAdjustment {
+  final int id;
+  final String label;
+  final String category;
+  final String direction; // 'addition' | 'deduction'
+  final num amount;
+  final String? reason;
+
+  const PayslipAdjustment({
+    required this.id,
+    required this.label,
+    required this.category,
+    required this.direction,
+    required this.amount,
+    required this.reason,
+  });
+
+  bool get isDeduction => direction == 'deduction';
+
+  factory PayslipAdjustment.fromJson(Map<String, dynamic> j) => PayslipAdjustment(
+        id: _id(j['id']) ?? 0,
+        label: (j['label'] ?? '') as String,
+        category: (j['category'] ?? '') as String,
+        direction: (j['direction'] ?? 'addition') as String,
+        amount: Money.asNum(j['amount']),
+        reason: j['reason'] as String?,
       );
 }
 
@@ -140,6 +185,13 @@ class Payslip {
   final PayrollRunRef? run;
   final List<PayslipItem> items;
 
+  /// The ACTIVE corrections against this payslip and the net they make
+  /// (`adjustments[]` + `totals.adjusted_net_pay`, server 2026-09-25). Both
+  /// come from the one read, so they cannot disagree. Null / empty from an
+  /// older server.
+  final List<PayslipAdjustment> adjustments;
+  final num? adjustedNetPay;
+
   const Payslip({
     required this.id,
     required this.status,
@@ -154,12 +206,24 @@ class Payslip {
     required this.wht,
     required this.run,
     required this.items,
+    this.adjustments = const [],
+    this.adjustedNetPay,
   });
+
+  /// What is actually paid; the original stays in [netPay].
+  num get paidNet => adjustedNetPay ?? netPay;
+  bool get isAdjusted => adjustedNetPay != null && adjustedNetPay != netPay;
 
   factory Payslip.fromJson(Map<String, dynamic> data) {
     final p = (data['payslip'] as Map<String, dynamic>?) ?? const {};
     final rawItems = (data['items'] as List?) ?? const [];
+    final rawAdjustments = (data['adjustments'] as List?) ?? const [];
+    final totals = data['totals'] as Map<String, dynamic>?;
     return Payslip(
+      adjustments: rawAdjustments.whereType<Map<String, dynamic>>().map(PayslipAdjustment.fromJson).toList(growable: false),
+      // The totals object is the authority; the row's own column is the same
+      // sum and covers a server that sends one but not the other.
+      adjustedNetPay: Money.toNum(totals?['adjusted_net_pay']) ?? Money.toNum(p['adjusted_net_pay']),
       id: _id(p['id']) ?? 0,
       status: p['status'] as String?,
       transactionDate: p['transaction_date'] as String?,

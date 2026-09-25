@@ -72,6 +72,54 @@ void main() {
       expect(p.netPay, 12480.50);
     });
 
+    // Corrections HR files after finalizing (server 2026-09-25): the figure
+    // shown is the ADJUSTED one, the original stays, and a server that never
+    // sends the column still shows the right money.
+    test('a list row pays the adjusted net and says so; an older server pays the original', () {
+      final moved = PayslipSummary.fromJson(payslipRow(481, adjustedNetPay: '12980.50'));
+      expect(moved.paidNet, 12980.50);
+      expect(moved.netPay, 12480.50);
+      expect(moved.isAdjusted, isTrue);
+
+      final same = PayslipSummary.fromJson(payslipRow(481, adjustedNetPay: '12480.50'));
+      expect(same.isAdjusted, isFalse);
+
+      final old = PayslipSummary.fromJson(payslipRow(481));
+      expect(old.adjustedNetPay, isNull);
+      expect(old.paidNet, 12480.50);
+      expect(old.isAdjusted, isFalse);
+    });
+
+    test('the detail carries the active adjustments and the net they make', () {
+      final p = Payslip.fromJson(payslipDetail(
+        481,
+        adjustments: [
+          adjustment(9, 'addition', 'earning', 'Missed OT', '500.00', reason: 'OT not captured'),
+          adjustment(10, 'deduction', 'tax', 'Withholding tax on Missed OT', '75.00'),
+        ],
+        totals: {
+          'payslip_id': 481,
+          'original_net_pay': 12480.50,
+          'adjustment_additions': 500,
+          'adjustment_deductions': 75,
+          'adjusted_net_pay': 12905.50,
+        },
+      ));
+      expect(p.adjustments.length, 2);
+      expect(p.adjustments.first.label, 'Missed OT');
+      expect(p.adjustments.first.isDeduction, isFalse);
+      expect(p.adjustments.last.isDeduction, isTrue);
+      expect(p.adjustments.last.amount, 75);
+      expect(p.paidNet, 12905.50);
+      expect(p.netPay, 12480.50);
+      expect(p.isAdjusted, isTrue);
+
+      final old = Payslip.fromJson(payslipDetail(481));
+      expect(old.adjustments, isEmpty);
+      expect(old.paidNet, 12480.50);
+      expect(old.isAdjusted, isFalse);
+    });
+
     test('the detail carries only the EMPLOYEE share of the statutory columns', () {
       final p = Payslip.fromJson(payslipDetail(481));
       expect(p.sssEe, 675.00);
