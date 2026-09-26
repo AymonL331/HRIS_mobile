@@ -342,6 +342,23 @@
     return canvas;
   }
 
+  // A horizontally flipped COPY of a canvas already drawn (2026-09-26). The live
+  // preview is a mirror (the video's CSS scaleX(-1), like every selfie camera), so
+  // the employee framed themselves in mirror view — but the photo was saved from
+  // the raw frame, so HR saw the REVERSE of what the employee saw. The photo is now
+  // saved as previewed. Only the JPEG is flipped: the fingerprint is still taken
+  // from the unflipped canvas, exactly as before, so face matching is unaffected.
+  function mirroredCopy(canvas) {
+    const out = document.createElement('canvas');
+    out.width = canvas.width;
+    out.height = canvas.height;
+    const ctx = out.getContext('2d');
+    ctx.translate(out.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(canvas, 0, 0);
+    return out;
+  }
+
   function jpegBase64(canvas) {
     for (const quality of [0.85, 0.72, 0.6]) {
       const data = canvas.toDataURL('image/jpeg', quality).replace(/^data:image\/jpeg;base64,/, '');
@@ -360,7 +377,7 @@
           const { faceCount, face } = await detectFace(canvas);
           const frontal = face && face.yaw != null && Math.abs(face.yaw) <= ENROLL_MAX_YAW;
           if (faceCount === 1 && face && frontal && face.detectionScore >= ENROLL_MIN_SCORE && isUsableEmbedding(face.embedding)) {
-            const photo = jpegBase64(canvas);
+            const photo = jpegBase64(mirroredCopy(canvas)); // as previewed; see mirroredCopy
             if (photo) {
               phase = 'done';
               stopCamera();
