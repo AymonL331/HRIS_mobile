@@ -36,7 +36,7 @@ class PayslipBreakdownView extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: HrisSpace.s3),
         child: Text(
           'Working out the breakdown…',
-          style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+          style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
         ),
       );
     }
@@ -50,7 +50,7 @@ class PayslipBreakdownView extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: HrisSpace.s3),
           child: Text(
             'How this was computed',
-            style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+            style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text),
           ),
         ),
 
@@ -175,24 +175,30 @@ class _Block extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+                  style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 20 / 14, color: t.text),
                 ),
               ),
               Text(
                 Money.format(amount),
-                style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+                style: TextStyle(
+                  fontSize: HrisType.sm,
+                  fontWeight: HrisType.semibold,
+                  height: 20 / 14,
+                  color: t.text,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: HrisSpace.s1),
-          Text(formula, style: TextStyle(fontSize: HrisType.xs, height: 1.45, color: t.muted)),
+          const SizedBox(height: 2),
+          Text(formula, style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2)),
           if (rows.isNotEmpty) ...[
-            const SizedBox(height: HrisSpace.s3),
+            const SizedBox(height: HrisSpace.s2),
             for (final row in rows) row,
           ],
           for (final note in notes) ...[
             const SizedBox(height: HrisSpace.s3),
-            Text(note, style: TextStyle(fontSize: HrisType.xxs, height: 1.5, color: t.muted)),
+            Text(note, style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, color: t.text2)),
           ],
         ],
       ),
@@ -214,16 +220,18 @@ class _DayRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
     final labelColor = dimmed ? t.muted : t.text;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: HrisSpace.s1),
+    // A ruled row, as the web's day list.
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: HrisSpace.s2),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: t.border))),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 58,
+            width: 60,
             child: Text(
               formatShortDate(date),
-              style: TextStyle(fontSize: HrisType.xs, fontWeight: HrisType.semibold, height: 1.45, color: labelColor),
+              style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.medium, height: 20 / 14, color: labelColor),
             ),
           ),
           const SizedBox(width: HrisSpace.s2),
@@ -235,14 +243,20 @@ class _DayRow extends StatelessWidget {
                   StatusBadge(tag!, tone: StatusTone.info),
                   const SizedBox(height: HrisSpace.s1),
                 ],
-                Text(note, style: TextStyle(fontSize: HrisType.xs, height: 1.45, color: t.muted)),
+                Text(note, style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: dimmed ? t.muted : t.text2)),
               ],
             ),
           ),
           const SizedBox(width: HrisSpace.s2),
           Text(
             amount,
-            style: TextStyle(fontSize: HrisType.xs, fontWeight: HrisType.semibold, height: 1.45, color: labelColor),
+            style: TextStyle(
+              fontSize: HrisType.sm,
+              fontWeight: HrisType.semibold,
+              height: 20 / 14,
+              color: labelColor,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
         ],
       ),

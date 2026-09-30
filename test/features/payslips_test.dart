@@ -409,10 +409,10 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // The tile labels are the web's uppercase micro-label.
-      expect(find.text('NET PAY'), findsWidgets);
+      // The tile labels are sentence case, as the web's figure tiles.
+      expect(find.text('Net pay'), findsWidgets);
       expect(find.text('₱12,480.50'), findsWidgets);
-      expect(find.text('BASIC PAY'), findsOneWidget);
+      expect(find.text('Basic pay'), findsOneWidget);
 
       // A lazy ListView never builds what is below the test viewport, so each
       // section below the fold is scrolled to before it is asserted on.

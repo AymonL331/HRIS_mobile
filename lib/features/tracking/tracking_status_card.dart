@@ -75,7 +75,7 @@ class TrackingStatusCard extends StatelessWidget {
                 for (final l in lines)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(l, style: TextStyle(fontSize: HrisType.xs, height: 1.45, color: t.muted)),
+                    child: Text(l, style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, color: t.text2)),
                   ),
                 if (!recording) ...[
                   const SizedBox(height: HrisSpace.s2),

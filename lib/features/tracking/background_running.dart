@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/device/device_readiness_service.dart';
 import '../../core/device/oem_hints.dart';
+import '../../shared/tokens.dart';
 
 /// WILL THIS PHONE LEAVE HRIS RUNNING while the employee is clocked in?
 ///
@@ -167,12 +168,12 @@ class OemHintLines extends StatelessWidget {
       children: [
         Text(
           'On ${hint.brand} phones, also do this ${hint.where} (names vary by model):',
-          style: TextStyle(fontSize: 12, height: 1.45, fontWeight: FontWeight.w600, color: color),
+          style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, fontWeight: HrisType.semibold, color: color),
         ),
         for (final step in hint.steps)
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text('• $step', style: TextStyle(fontSize: 12, height: 1.45, color: color)),
+            child: Text('• $step', style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, color: color)),
           ),
       ],
     );

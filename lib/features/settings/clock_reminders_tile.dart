@@ -151,7 +151,7 @@ class _ExactAlarmSteps extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const style = TextStyle(fontSize: 12, height: 1.45);
+    const style = TextStyle(fontSize: HrisType.xs, height: 18 / 12);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

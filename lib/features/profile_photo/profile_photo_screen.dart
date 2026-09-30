@@ -183,14 +183,14 @@ class _ProfilePhotoScreenState extends State<ProfilePhotoScreen> {
                       : state.profileImageUrl != null
                           ? 'Your profile photo'
                           : 'No profile photo yet',
-                  style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, color: t.text),
+                  style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text),
                 ),
                 if (preview != null) ...[
                   const SizedBox(height: HrisSpace.s1),
                   Text(
                     'HR checks it before it replaces your current photo.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: HrisType.xs, color: t.muted),
+                    style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
                   ),
                 ],
               ],
@@ -210,7 +210,7 @@ class _ProfilePhotoScreenState extends State<ProfilePhotoScreen> {
           if (!widget.canSend)
             Text(
               'Changing your profile photo from the app is turned off for your account. Ask HR if you need a new one.',
-              style: TextStyle(fontSize: HrisType.sm, color: t.muted),
+              style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
             )
           else if (preview != null) ...[
             FilledButton(
@@ -241,7 +241,7 @@ class _ProfilePhotoScreenState extends State<ProfilePhotoScreen> {
                   ? 'A new photo replaces the one waiting for HR.'
                   : 'Uses the camera. HR checks the photo before it replaces your current one.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: HrisType.xs, color: t.muted),
+              style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2),
             ),
           ],
         ],
@@ -293,9 +293,9 @@ class _PhotoCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
     final placeholder = Container(
-      color: t.primarySoft,
+      color: t.neutral.bg,
       alignment: Alignment.center,
-      child: Icon(Icons.person_outline, size: 72, color: t.primary),
+      child: Icon(Icons.person_outline, size: 72, color: t.text2),
     );
     Widget image = placeholder;
     if (memory != null) {
@@ -321,7 +321,7 @@ class _PhotoCircle extends StatelessWidget {
     return Container(
       width: _size,
       height: _size,
-      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: t.border, width: 2)),
+      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: t.borderStrong)),
       clipBehavior: Clip.antiAlias,
       child: image,
     );

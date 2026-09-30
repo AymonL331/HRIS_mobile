@@ -149,7 +149,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
     // 3. The page. `hrisStart` is called once it reports itself loaded.
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF0F172A))
+      ..setBackgroundColor(HrisCamera.stage)
       ..addJavaScriptChannel('HrisFace', onMessageReceived: _onPageMessage)
       // The page's console, forwarded so `adb logcat` can see which stage a
       // capture reached. It logs stages and backend choices only — never a
@@ -271,7 +271,6 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = HrisTokens.of(context);
     final label = widget.direction == 'in' ? 'Time In' : 'Time Out';
     return PopScope(
       canPop: false,
@@ -280,7 +279,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
         if (!didPop) _finish(const FaceFailed(FaceFailure.cancelled));
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: HrisCamera.stage,
         appBar: AppBar(
           title: Text(widget.title ?? 'Face check · $label'),
           leading: IconButton(
@@ -300,17 +299,18 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                   if (_web != null) WebViewWidget(controller: _web!),
                   if (_stage.isNotEmpty)
                     ColoredBox(
-                      color: const Color(0xFF0F172A),
+                      color: HrisCamera.stage,
                       child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const CircularProgressIndicator(),
+                            // On the dark stage in both themes: the web kiosk's light ink.
+                            const CircularProgressIndicator(color: HrisCamera.ink2),
                             const SizedBox(height: HrisSpace.s4),
                             Text(
                               _stage,
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
+                              style: const TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: HrisCamera.ink2),
                             ),
                           ],
                         ),
@@ -335,8 +335,8 @@ class _FailurePanel extends StatelessWidget {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(HrisSpace.s4),
+        // A plain card with the error banner, as the web: one red element, not two.
         child: AppCard(
-          tone: AppCardTone.danger,
           maxWidth: 440,
           centered: true,
           child: Column(

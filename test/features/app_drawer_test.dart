@@ -113,7 +113,9 @@ void main() {
   testWidgets('the sidebar follows dark mode', (tester) async {
     await pumpDrawer(tester, selected: 1, brightness: Brightness.dark);
     final label = tester.widget<Text>(find.text('Attendance'));
-    expect(label.style!.color, HrisTokens.dark.primary);
+    // The text-safe petrol (--primary-text): the brand petrol is under 4.5:1 on
+    // the dark active fill, so the web draws active text in the link tint.
+    expect(label.style!.color, HrisTokens.dark.primaryText);
     final inactive = tester.widget<Text>(find.text('Settings'));
     expect(inactive.style!.color, HrisTokens.dark.text);
   });

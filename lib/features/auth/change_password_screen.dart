@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/http/api_exception.dart';
 import '../../core/http/endpoints.dart';
+import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/message_banner.dart';
 
@@ -112,14 +113,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           TextButton(onPressed: _busy ? null : () => session.logout(), child: const Text('Sign out')),
         ],
       ),
-      // The web ChangePasswordPage: the same auth card as the login.
+      // The web ChangePasswordPage: the same auth card as the login, near the top.
       body: SafeArea(
-        child: Center(
+        child: Align(
+          alignment: Alignment.topCenter,
           child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s5, HrisSpace.s4, HrisSpace.s6),
           child: AppCard(
             maxWidth: 420,
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(HrisSpace.s5),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -139,7 +141,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   textInputAction: TextInputAction.next,
                   decoration: InputDecoration(labelText: 'Current password', errorText: _fieldErrors['current_password']),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: HrisSpace.s4),
                 TextField(
                   controller: _next,
                   obscureText: _obscure,
@@ -151,7 +153,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     errorText: _fieldErrors['new_password'],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: HrisSpace.s4),
                 TextField(
                   controller: _confirm,
                   obscureText: _obscure,

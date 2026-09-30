@@ -29,16 +29,23 @@ class SettingsScreen extends StatelessWidget {
       builder: (ctx) => SimpleDialog(
         title: const Text('Switch environment'),
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
-            child: Text('Switching signs you out of the current one.'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Text(
+              'Switching signs you out of the current one.',
+              style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: HrisTokens.of(ctx).text2),
+            ),
           ),
           for (final e in envs)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(ctx, e),
               child: Row(
                 children: [
-                  Icon(e == current ? Icons.radio_button_checked : Icons.radio_button_off, size: 20),
+                  Icon(
+                    e == current ? Icons.radio_button_checked : Icons.radio_button_off,
+                    size: 20,
+                    color: e == current ? HrisTokens.of(ctx).primaryText : HrisTokens.of(ctx).text2,
+                  ),
                   const SizedBox(width: 12),
                   Text(e.label),
                 ],
@@ -69,7 +76,8 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           children: [
             for (var i = 0; i < tiles.length; i += 1) ...[
-              if (i > 0) Divider(height: 1, indent: HrisSpace.s4, color: t.border),
+              // Full-width rules, as the web's ruled lists.
+              if (i > 0) Divider(height: 1, thickness: 1, color: t.border),
               tiles[i],
             ],
           ],
@@ -77,59 +85,67 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
 
-    return ListView(
-      padding: const EdgeInsets.only(bottom: HrisSpace.s5),
-      children: [
-        const SectionLabel('Account'),
-        group([
-          ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: Text(user?.username ?? '—'),
-            subtitle: Text(
-              [if (tenant != null) tenant.name, if (user?.email.isNotEmpty ?? false) user!.email].join(' · '),
+    // The rows: grey icons, secondary subtitles (the web's list rows).
+    return ListTileTheme(
+      data: ListTileTheme.of(context).copyWith(
+        iconColor: t.text2,
+        subtitleTextStyle: TextStyle(fontFamily: HrisFont.sans, fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
+        titleTextStyle: TextStyle(fontFamily: HrisFont.sans, fontSize: HrisType.sm, fontWeight: HrisType.medium, height: 20 / 14, color: t.text),
+      ),
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: HrisSpace.s5),
+        children: [
+          const SectionLabel('Account'),
+          group([
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: Text(user?.username ?? '—'),
+              subtitle: Text(
+                [if (tenant != null) tenant.name, if (user?.email.isNotEmpty ?? false) user!.email].join(' · '),
+              ),
             ),
-          ),
-          // NOT a button. Changing a password starts with HR, not with the
-          // holder: they reset the login, the server issues a temporary
-          // password, and the employee replaces it on their next sign-in
-          // (`must_change_password`). Offering a self-service "change" here
-          // would be a second, weaker door to the same credential — one that
-          // skips the handover the whole flow is built around. So this tile
-          // only says where the real route is.
-          const ListTile(
-            leading: Icon(Icons.password_outlined),
-            title: Text('Password'),
-            subtitle: Text(
-              'The same password as the HRIS website. To reset it, ask HR — they issue a temporary '
-              'password, and you choose your own the next time you sign in here or on the website.',
+            // NOT a button. Changing a password starts with HR, not with the
+            // holder: they reset the login, the server issues a temporary
+            // password, and the employee replaces it on their next sign-in
+            // (`must_change_password`). Offering a self-service "change" here
+            // would be a second, weaker door to the same credential — one that
+            // skips the handover the whole flow is built around. So this tile
+            // only says where the real route is.
+            const ListTile(
+              leading: Icon(Icons.password_outlined),
+              title: Text('Password'),
+              subtitle: Text(
+                'The same password as the HRIS website. To reset it, ask HR — they issue a temporary '
+                'password, and you choose your own the next time you sign in here or on the website.',
+              ),
+              isThreeLine: true,
             ),
-            isThreeLine: true,
-          ),
-        ]),
-        const SectionLabel('Environment'),
-        group([
-          ListTile(
-            leading: const Icon(Icons.cloud_outlined),
-            title: Text(env.selected.label),
-            subtitle: Text(env.baseUrl),
-            trailing: const Icon(Icons.swap_horiz),
-            onTap: () => _switchEnv(context),
-          ),
-        ]),
-        // Whether this phone will let the app keep recording during a shift —
-        // always visible, so a phone can be checked before it causes a gap.
-        // And whether it will deliver the clock-in / clock-out reminders.
-        const SectionLabel('Phone'),
-        group([const BackgroundRunningTile(), const ClockRemindersTile()]),
-        const SectionLabel('About'),
-        group([
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('Version'),
-            subtitle: Text(session.appVersion),
-          ),
-        ]),
-      ],
+          ]),
+          const SectionLabel('Environment'),
+          group([
+            ListTile(
+              leading: const Icon(Icons.cloud_outlined),
+              title: Text(env.selected.label),
+              subtitle: Text(env.baseUrl, style: const TextStyle(fontFamily: HrisFont.mono, fontSize: HrisType.xs)),
+              trailing: const Icon(Icons.swap_horiz),
+              onTap: () => _switchEnv(context),
+            ),
+          ]),
+          // Whether this phone will let the app keep recording during a shift —
+          // always visible, so a phone can be checked before it causes a gap.
+          // And whether it will deliver the clock-in / clock-out reminders.
+          const SectionLabel('Phone'),
+          group([const BackgroundRunningTile(), const ClockRemindersTile()]),
+          const SectionLabel('About'),
+          group([
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('Version'),
+              subtitle: Text(session.appVersion, style: const TextStyle(fontFamily: HrisFont.mono)),
+            ),
+          ]),
+        ],
+      ),
     );
   }
 }

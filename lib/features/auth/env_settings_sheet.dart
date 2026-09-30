@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/config/app_env.dart';
 import '../../core/config/env_store.dart';
+import '../../shared/tokens.dart';
 
 /// The "Advanced" sheet on the login screen: edit the Main and Sandbox server
 /// addresses, or reset them to the compiled defaults. Nothing here touches a
@@ -84,20 +85,20 @@ class _EnvSettingsSheetState extends State<EnvSettingsSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Server addresses', style: Theme.of(context).textTheme.titleLarge),
+          Text('Server addresses', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(
             'Where the app finds the HRIS API. Only change these if IT gave you a new address.',
-            style: Theme.of(context).textTheme.bodySmall,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: HrisTokens.of(context).text2),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           TextField(
             controller: _main,
             keyboardType: TextInputType.url,
             autocorrect: false,
             decoration: InputDecoration(labelText: 'Main HRIS', errorText: _mainError, hintText: 'https://…'),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           TextField(
             controller: _sandbox,
             keyboardType: TextInputType.url,
@@ -111,7 +112,7 @@ class _EnvSettingsSheetState extends State<EnvSettingsSheet> {
               const Spacer(),
               FilledButton(
                 onPressed: _saving ? null : _save,
-                style: FilledButton.styleFrom(minimumSize: const Size(120, 48)),
+                style: FilledButton.styleFrom(minimumSize: const Size(120, HrisSize.control)),
                 child: const Text('Save'),
               ),
             ],

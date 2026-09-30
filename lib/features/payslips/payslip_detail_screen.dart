@@ -85,12 +85,14 @@ class _PayslipBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(HrisSpace.s4, 0, HrisSpace.s4, HrisSpace.s6),
       children: [
+        // Aligned with the panels below it (the list already has the gutter).
         PageHeader(
           payslip.run?.displayName ?? 'Payslip #${payslip.id}',
           subtitle: payslip.transactionDate == null ? null : formatDateOnly(payslip.transactionDate),
+          padding: const EdgeInsets.fromLTRB(0, HrisSpace.s4, 0, HrisSpace.s2),
         ),
         Padding(
-          padding: const EdgeInsets.only(left: HrisSpace.s4, bottom: HrisSpace.s4),
+          padding: const EdgeInsets.only(bottom: HrisSpace.s4),
           child: Align(
             alignment: Alignment.centerLeft,
             child: StatusBadge(payslipStatusLabel(payslip.status), tone: payslipStatusTone(payslip.status)),
@@ -99,41 +101,75 @@ class _PayslipBody extends StatelessWidget {
 
         // The one figure people open a payslip for. A correction HR filed after
         // finalizing moves it; the original stays readable under it, as on the web.
-        AppCard(
+        // The web's net-pay box: petrol-soft fill, the figure in petrol.
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(HrisSpace.s4),
+          decoration: BoxDecoration(
+            color: t.primarySoft,
+            border: Border.all(color: t.primary.withValues(alpha: 0.25)),
+            borderRadius: BorderRadius.circular(HrisRadius.panel),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SectionLabel(payslip.isAdjusted ? 'Adjusted net pay' : 'Net pay', padding: EdgeInsets.zero),
-              const SizedBox(height: HrisSpace.s1),
+              Text(
+                payslip.isAdjusted ? 'Adjusted net pay' : 'Net pay',
+                style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.medium, height: 20 / 14, color: t.text2),
+              ),
+              const SizedBox(height: 2),
               Text(
                 Money.format(payslip.paidNet),
-                style: TextStyle(fontSize: HrisType.stat, fontWeight: HrisType.semibold, height: 1.15, color: t.text),
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: HrisType.semibold,
+                  height: 36 / 28,
+                  color: t.primaryText,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
               if (payslip.isAdjusted)
                 Text(
                   'Originally ${Money.format(payslip.netPay)}',
-                  style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+                  style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2),
                 ),
             ],
           ),
         ),
         const SizedBox(height: HrisSpace.s3),
 
-        // The web's four tiles, two-up on a phone.
-        Row(
-          children: [
-            Expanded(child: _Tile(label: 'Basic pay', value: payslip.basicPay)),
-            const SizedBox(width: HrisSpace.s3),
-            Expanded(child: _Tile(label: 'Total earnings', value: payslip.totalEarnings)),
-          ],
-        ),
-        const SizedBox(height: HrisSpace.s3),
-        Row(
-          children: [
-            Expanded(child: _Tile(label: 'Total deductions', value: payslip.totalDeductions)),
-            const SizedBox(width: HrisSpace.s3),
-            Expanded(child: _Tile(label: 'Net pay', value: payslip.netPay, accent: true)),
-          ],
+        // The web's four figures: one panel, two-up, ruled between the cells.
+        Container(
+          decoration: BoxDecoration(
+            color: t.surface,
+            border: Border.all(color: t.border),
+            borderRadius: BorderRadius.circular(HrisRadius.panel),
+          ),
+          child: Column(
+            children: [
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: _Tile(label: 'Basic pay', value: payslip.basicPay)),
+                    VerticalDivider(width: 1, thickness: 1, color: t.border),
+                    Expanded(child: _Tile(label: 'Total earnings', value: payslip.totalEarnings)),
+                  ],
+                ),
+              ),
+              Divider(height: 1, thickness: 1, color: t.border),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: _Tile(label: 'Total deductions', value: payslip.totalDeductions)),
+                    VerticalDivider(width: 1, thickness: 1, color: t.border),
+                    Expanded(child: _Tile(label: 'Net pay', value: payslip.netPay, accent: true)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: HrisSpace.s3),
 
@@ -143,24 +179,32 @@ class _PayslipBody extends StatelessWidget {
             children: [
               Text(
                 'Statutory contributions',
-                style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+                style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text),
               ),
-              const SizedBox(height: HrisSpace.s1),
+              const SizedBox(height: 2),
               Text(
                 'Your employee-share deductions for this pay period.',
-                style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+                style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
               ),
-              const SizedBox(height: HrisSpace.s3),
+              const SizedBox(height: HrisSpace.s2),
+              // The web's ruled figure list: a rule under every line.
               for (final (label, value) in statutory)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: HrisSpace.s1),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.border))),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(label, style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.muted)),
+                      Text(label, style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2)),
                       Text(
                         Money.format(value),
-                        style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.4, color: t.text),
+                        style: TextStyle(
+                          fontSize: HrisType.sm,
+                          fontWeight: HrisType.semibold,
+                          height: 20 / 14,
+                          color: t.text,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ],
                   ),
@@ -180,17 +224,18 @@ class _PayslipBody extends StatelessWidget {
               children: [
                 Text(
                   'Adjustments',
-                  style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+                  style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text),
                 ),
-                const SizedBox(height: HrisSpace.s1),
+                const SizedBox(height: 2),
                 Text(
                   'Corrections filed after this payslip was finalized. They are paid with it.',
-                  style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+                  style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
                 ),
-                const SizedBox(height: HrisSpace.s3),
+                const SizedBox(height: HrisSpace.s2),
                 for (final a in payslip.adjustments)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: HrisSpace.s1),
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.border))),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -198,10 +243,10 @@ class _PayslipBody extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(a.label, style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.text)),
+                              Text(a.label, style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text)),
                               Text(
                                 [payslipItemCategoryLabels[a.category] ?? a.category, if (a.reason != null && a.reason!.isNotEmpty) a.reason!].join(' · '),
-                                style: TextStyle(fontSize: HrisType.xxs, height: 1.4, color: t.muted),
+                                style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2),
                               ),
                             ],
                           ),
@@ -212,8 +257,9 @@ class _PayslipBody extends StatelessWidget {
                           style: TextStyle(
                             fontSize: HrisType.sm,
                             fontWeight: HrisType.semibold,
-                            height: 1.4,
+                            height: 20 / 14,
                             color: a.isDeduction ? t.danger.text : t.text,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ],
@@ -231,13 +277,13 @@ class _PayslipBody extends StatelessWidget {
             children: [
               Text(
                 'Breakdown',
-                style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+                style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text),
               ),
               const SizedBox(height: HrisSpace.s3),
               if (groups.isEmpty)
                 Text(
                   'No line items were recorded for this payslip.',
-                  style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+                  style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
                 )
               else
                 for (final group in groups) ...[
@@ -254,15 +300,22 @@ class _PayslipBody extends StatelessWidget {
                               spacing: HrisSpace.s2,
                               runSpacing: HrisSpace.s1,
                               children: [
-                                Text(item.name, style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.text)),
-                                if (item.taxable) const StatusBadge('Taxable', tone: StatusTone.warning),
+                                Text(item.name, style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text)),
+                                // A neutral tag, as the web's line item.
+                                if (item.taxable) const StatusBadge('Taxable', tone: StatusTone.neutral),
                               ],
                             ),
                           ),
                           const SizedBox(width: HrisSpace.s3),
                           Text(
                             Money.format(item.amount),
-                            style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.4, color: t.text),
+                            style: TextStyle(
+                              fontSize: HrisType.sm,
+                              fontWeight: HrisType.semibold,
+                              height: 20 / 14,
+                              color: t.text,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
                           ),
                         ],
                       ),
@@ -292,22 +345,24 @@ class _Tile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
-    return AppCard(
+    // One cell of the figures panel (the panel draws the border and rules).
+    return Padding(
       padding: const EdgeInsets.all(HrisSpace.s4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionLabel(label, padding: EdgeInsets.zero),
+          Text(label, style: TextStyle(fontSize: HrisType.xs, fontWeight: HrisType.medium, height: 16 / 12, color: t.text2)),
           const SizedBox(height: HrisSpace.s1),
           Text(
             Money.format(value),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: HrisType.lg,
+              fontSize: HrisType.md,
               fontWeight: HrisType.semibold,
-              height: 1.25,
-              color: accent ? t.primary : t.text,
+              height: 24 / 16,
+              color: accent ? t.primaryText : t.text,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -325,6 +380,7 @@ class _DetailEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The web's EmptyState card; the icon stays, as a neutral gate mark.
     final t = HrisTokens.of(context);
     return Center(
       child: SingleChildScrollView(
@@ -336,18 +392,23 @@ class _DetailEmpty extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 40, color: t.muted),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: t.neutral.bg, borderRadius: BorderRadius.circular(HrisRadius.control)),
+                child: Icon(icon, size: 22, color: t.text2),
+              ),
               const SizedBox(height: HrisSpace.s3),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
+                style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text),
               ),
-              const SizedBox(height: HrisSpace.s2),
+              const SizedBox(height: HrisSpace.s1),
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
+                style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
               ),
             ],
           ),
@@ -368,8 +429,8 @@ class _DetailError extends StatelessWidget {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(HrisSpace.s4),
+        // A plain card with the error banner, as the web: one red element, not two.
         child: AppCard(
-          tone: AppCardTone.danger,
           maxWidth: 440,
           centered: true,
           child: Column(

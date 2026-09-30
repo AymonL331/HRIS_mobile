@@ -128,7 +128,7 @@ class _EnrollmentOutcomeBannerState extends State<EnrollmentOutcomeBanner> {
               ],
             ),
             const SizedBox(height: HrisSpace.s1),
-            Text(body, style: TextStyle(fontSize: HrisType.sm, height: 1.45, color: t.muted)),
+            Text(body, style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2)),
             const SizedBox(height: HrisSpace.s2),
             Align(
               alignment: Alignment.centerRight,

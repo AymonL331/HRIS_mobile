@@ -28,10 +28,11 @@ class UserAvatar extends StatelessWidget {
       width: HrisSize.avatar,
       height: HrisSize.avatar,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: t.primary, shape: BoxShape.circle),
+      // The web Avatar: neutral tint, 1px border, secondary-colour initial.
+      decoration: BoxDecoration(color: t.neutral.bg, shape: BoxShape.circle, border: Border.all(color: t.border)),
       child: Text(
         initial,
-        style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1, color: t.primaryContrast),
+        style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1, color: t.text2),
       ),
     );
 

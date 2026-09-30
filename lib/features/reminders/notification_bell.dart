@@ -34,14 +34,15 @@ class NotificationBell extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                   constraints: const BoxConstraints(minWidth: 18, minHeight: 16),
                   decoration: BoxDecoration(
-                    color: t.danger.solid,
+                    // The web count badge: --count-bg (brand red).
+                    color: t.countBg,
                     borderRadius: BorderRadius.circular(HrisRadius.pill),
                     border: Border.all(color: t.surface, width: 1.5),
                   ),
                   child: Text(
                     badgeText(unread),
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 10, fontWeight: HrisType.semibold, height: 1.2, color: t.primaryContrast),
+                    style: TextStyle(fontSize: 11, fontWeight: HrisType.semibold, height: 1.2, color: t.primaryContrast),
                   ),
                 ),
               ),

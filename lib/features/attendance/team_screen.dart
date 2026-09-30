@@ -84,15 +84,25 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
                 icon: const Icon(Icons.chevron_left),
                 onPressed: c.loading ? null : c.previousDay,
               ),
+              // The web's date field: a bordered 44px control with a calendar
+              // glyph. Tapping it opens the same picker as before.
               Expanded(
-                child: TextButton(
+                child: OutlinedButton.icon(
                   onPressed: c.loading ? null : () => _pickDate(c),
-                  child: Text(
-                    ManilaTime.longDate(c.date),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s2),
+                    foregroundColor: t.text,
+                  ),
+                  icon: Icon(Icons.calendar_today_outlined, size: 18, color: t.text2),
+                  // Scales down rather than clipping the year when Today is showing.
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      ManilaTime.longDate(c.date),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.medium, height: 20 / 14, color: t.text),
+                      maxLines: 1,
+                    ),
                   ),
                 ),
               ),
@@ -104,7 +114,7 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
               if (!c.isToday)
                 TextButton(
                   onPressed: c.loading ? null : c.goToToday,
-                  style: TextButton.styleFrom(foregroundColor: t.primary),
+                  style: TextButton.styleFrom(foregroundColor: t.primaryText),
                   child: const Text('Today'),
                 ),
             ],
@@ -140,7 +150,7 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
               alignment: Alignment.centerLeft,
               child: Text(
                 '${c.total} employee${c.total == 1 ? '' : 's'} · $summary',
-                style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+                style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
               ),
             ),
           ),
@@ -155,8 +165,8 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
       return Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(HrisSpace.s4),
+          // A plain card with the error banner, as the web: one red element, not two.
           child: AppCard(
-            tone: AppCardTone.danger,
             maxWidth: 440,
             centered: true,
             child: Column(
@@ -205,7 +215,7 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
                     child: Text(
                       c.search.trim().isEmpty ? 'No employees to show for this day.' : 'No employee matches "${c.search.trim()}".',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.muted),
+                      style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
                     ),
                   ),
                 ),
@@ -219,7 +229,7 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
                 sliver: SliverList.separated(
                   itemCount: c.items.length,
                   itemBuilder: (_, i) => _PersonTile(day: c.items[i]),
-                  separatorBuilder: (_, _) => Divider(height: 1, indent: HrisSpace.s4, color: t.border),
+                  separatorBuilder: (_, _) => Divider(height: 1, thickness: 1, color: t.border),
                 ),
               ),
             ),
@@ -296,10 +306,10 @@ class _PersonTile extends StatelessWidget {
                       day.employeeName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+                      style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 20 / 14, color: t.text),
                     ),
                     if (day.employeeCode != null)
-                      Text(day.employeeCode!, style: TextStyle(fontSize: HrisType.xxs, fontWeight: HrisType.semibold, height: 1.3, color: t.muted)),
+                      Text(day.employeeCode!, style: TextStyle(fontFamily: HrisFont.mono, fontSize: HrisType.xs, height: 16 / 12, color: t.text2)),
                   ],
                 ),
               ),
@@ -311,17 +321,25 @@ class _PersonTile extends StatelessWidget {
             const SizedBox(height: HrisSpace.s1 + 2),
             Row(
               children: [
-                Text(times, style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.text)),
+                Text(times, style: TextStyle(fontFamily: HrisFont.mono, fontSize: HrisType.sm, height: 20 / 14, color: t.text)),
                 if (day.workedLabel.isNotEmpty) ...[
                   const Spacer(),
-                  Text(day.workedLabel, style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted)),
+                  Text(
+                    day.workedLabel,
+                    style: TextStyle(
+                      fontSize: HrisType.sm,
+                      height: 20 / 14,
+                      color: t.text2,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
                 ],
               ],
             ),
           ],
           if (where.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(where, style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(where, style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2), maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
           if (chips.isNotEmpty) ...[
             const SizedBox(height: HrisSpace.s2),

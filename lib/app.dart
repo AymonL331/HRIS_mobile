@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'core/auth/session_controller.dart';
@@ -28,7 +29,12 @@ class HrisApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       // In-app update (2026-09-15): above every route, so a newer version is offered
       // — or a required one enforced — wherever the employee is, login included.
-      builder: (context, child) => UpdateGate(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        // Status + navigation bars in the page colour (screens with an app bar
+        // set the same style through the theme).
+        value: hrisSystemUi(Theme.of(context).brightness),
+        child: UpdateGate(child: child ?? const SizedBox.shrink()),
+      ),
       home: const AppRoot(),
     );
   }

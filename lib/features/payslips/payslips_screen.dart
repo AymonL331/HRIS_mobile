@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/format/money.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
+import '../../shared/widgets/kit.dart';
 import '../../shared/widgets/message_banner.dart';
 import '../../shared/widgets/status_badge.dart';
 import 'payslip_api.dart';
@@ -46,8 +47,8 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
       return Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(HrisSpace.s4),
+          // A plain card with the error banner, as the web: one red element, not two.
           child: AppCard(
-            tone: AppCardTone.danger,
             maxWidth: 440,
             centered: true,
             child: Column(
@@ -74,28 +75,10 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(HrisSpace.s4),
           children: [
-            AppCard(
-              maxWidth: 440,
-              centered: true,
-              padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s5, vertical: HrisSpace.s6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.receipt_long_outlined, size: 40, color: t.muted),
-                  const SizedBox(height: HrisSpace.s3),
-                  Text(
-                    'No payslips yet',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
-                  ),
-                  const SizedBox(height: HrisSpace.s2),
-                  Text(
-                    'Your payslips will appear here once payroll has been run for you.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
-                  ),
-                ],
-              ),
+            // The web's EmptyState: a 14 semibold title over a secondary line.
+            const StatePanel(
+              title: 'No payslips yet',
+              message: 'Your payslips will appear here once payroll has been run for you.',
             ),
           ],
         ),
@@ -127,7 +110,7 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
               padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s3, HrisSpace.s4, HrisSpace.s3),
               child: Text(
                 '${c.total} payslip${c.total == 1 ? '' : 's'}',
-                style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+                style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
               ),
             ),
           ),
@@ -138,7 +121,7 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
               sliver: SliverList.separated(
                 itemCount: c.items.length,
                 itemBuilder: (_, i) => _PayslipTile(payslip: c.items[i]),
-                separatorBuilder: (_, _) => Divider(height: 1, color: t.border),
+                separatorBuilder: (_, _) => Divider(height: 1, thickness: 1, color: t.border),
               ),
             ),
           ),
@@ -198,7 +181,7 @@ class _PayslipTile extends StatelessWidget {
                     runLabel,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+                    style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.medium, height: 20 / 14, color: t.text),
                   ),
                   const SizedBox(height: HrisSpace.s1),
                   Row(
@@ -206,11 +189,18 @@ class _PayslipTile extends StatelessWidget {
                       StatusBadge(payslipStatusLabel(payslip.status), tone: payslipStatusTone(payslip.status)),
                       const SizedBox(width: HrisSpace.s2),
                       Flexible(
-                        child: Text(
-                          '#${payslip.id}${payslip.transactionDate == null ? '' : ' · ${formatDateOnly(payslip.transactionDate)}'}',
+                        // The payslip number in the mono face, as the web's first
+                        // column; the date after it stays in the text face.
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: '#${payslip.id}', style: const TextStyle(fontFamily: HrisFont.mono)),
+                              if (payslip.transactionDate != null) TextSpan(text: ' · ${formatDateOnly(payslip.transactionDate)}'),
+                            ],
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: HrisType.xxs, height: 1.4, color: t.muted),
+                          style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2),
                         ),
                       ),
                     ],
@@ -224,14 +214,21 @@ class _PayslipTile extends StatelessWidget {
               children: [
                 Text(
                   Money.format(payslip.paidNet),
-                  style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
+                  style: TextStyle(
+                    fontSize: HrisType.md,
+                    fontWeight: HrisType.semibold,
+                    height: 24 / 16,
+                    color: t.text,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
                 Text(
                   payslip.isAdjusted ? 'Adjusted net' : 'Net pay',
-                  style: TextStyle(fontSize: HrisType.xxs, height: 1.4, color: t.muted),
+                  style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2),
                 ),
               ],
             ),
+            const SizedBox(width: HrisSpace.s1),
             Icon(Icons.chevron_right, size: 20, color: t.muted),
           ],
         ),

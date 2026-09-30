@@ -40,8 +40,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       return Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(HrisSpace.s4),
+          // A plain card with the error banner, as the web: one red element, not two.
           child: AppCard(
-            tone: AppCardTone.danger,
             maxWidth: 440,
             centered: true,
             child: Column(
@@ -90,14 +90,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           child: Text(
                             'No days recorded for this month.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.muted),
+                            style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
                           ),
                         ),
                       )
                     : SliverList.separated(
                         itemCount: m.days.length,
                         itemBuilder: (_, i) => _DayTile(day: m.days[i]),
-                        separatorBuilder: (_, _) => Divider(height: 1, indent: 72, color: t.border),
+                        // Full-width rules, as the web's table rows.
+                        separatorBuilder: (_, _) => Divider(height: 1, thickness: 1, color: t.border),
                       ),
               ),
             ),
@@ -156,13 +157,13 @@ class _MonthHeader extends SliverPersistentHeaderDelegate {
           children: [
             Text(
               ManilaTime.monthLabel(month.year, month.month),
-              style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 1.35, color: t.text),
+              style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text),
             ),
             Text(
               summary,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+              style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
             ),
           ],
         ),
@@ -214,12 +215,23 @@ class _DayTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // The date column: the day in tabular figures over the weekday.
           SizedBox(
-            width: 44,
+            width: 40,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(dayNum, style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.2, color: t.text)),
-                Text(dow, style: TextStyle(fontSize: HrisType.xxs, fontWeight: HrisType.semibold, height: 1.2, color: t.muted)),
+                Text(
+                  dayNum,
+                  style: TextStyle(
+                    fontSize: HrisType.lg,
+                    fontWeight: HrisType.semibold,
+                    height: 24 / 20,
+                    color: t.text,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                Text(dow, style: TextStyle(fontSize: HrisType.xs, fontWeight: HrisType.medium, height: 16 / 12, color: t.text2)),
               ],
             ),
           ),
@@ -233,13 +245,22 @@ class _DayTile extends StatelessWidget {
                     StatusBadge(badgeText, tone: badgeTone),
                     if (day.workedLabel.isNotEmpty) ...[
                       const Spacer(),
-                      Text(day.workedLabel, style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted)),
+                      Text(
+                        day.workedLabel,
+                        style: TextStyle(
+                          fontSize: HrisType.sm,
+                          height: 20 / 14,
+                          color: t.text2,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
                     ],
                   ],
                 ),
                 if (times != null) ...[
                   const SizedBox(height: HrisSpace.s1 + 2),
-                  Text(times, style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.text)),
+                  // Clock times in the mono face, as the web's DTR columns.
+                  Text(times, style: TextStyle(fontFamily: HrisFont.mono, fontSize: HrisType.sm, height: 20 / 14, color: t.text)),
                 ],
                 if (chips.isNotEmpty) ...[
                   const SizedBox(height: HrisSpace.s2),

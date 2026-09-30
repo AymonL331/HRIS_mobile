@@ -51,7 +51,7 @@ class BatteryWarningCard extends StatelessWidget {
                       const SizedBox(height: HrisSpace.s1),
                       Text(
                         'Your phone is allowed to stop HRIS in the background. When it does, your shift shows gaps you did not cause.',
-                        style: TextStyle(fontSize: HrisType.xs, height: 1.45, color: t.muted),
+                        style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, color: t.text2),
                       ),
                       const SizedBox(height: HrisSpace.s2),
                       OutlinedButton.icon(
@@ -61,7 +61,7 @@ class BatteryWarningCard extends StatelessWidget {
                       ),
                       if (state.hint != null) ...[
                         const SizedBox(height: HrisSpace.s2),
-                        OemHintLines(hint: state.hint!, color: t.muted),
+                        OemHintLines(hint: state.hint!, color: t.text2),
                         // Only when the steps are on the page this button opens.
                         if (state.hint!.onAppInfoPage) ...[
                           const SizedBox(height: HrisSpace.s1),

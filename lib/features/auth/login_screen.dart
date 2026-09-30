@@ -86,99 +86,116 @@ class _LoginScreenState extends State<LoginScreen> {
     const envs = AppEnv.values;
     final t = HrisTokens.of(context);
 
-    // The web login: one auth card on the page background — brand, a muted
-    // line, the fields recessed into the card, a full-width primary button.
+    // The web login (screen 01 at 390px): one card near the top of the page —
+    // the brand and the title line on the left, a rule, then the form and a
+    // full-width primary button.
     return Scaffold(
       body: SafeArea(
-        child: Center(
+        child: Align(
+          alignment: Alignment.topCenter,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(HrisSpace.s5),
+            padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s6, HrisSpace.s4, HrisSpace.s6),
             child: AppCard(
-              maxWidth: 380,
-              padding: const EdgeInsets.all(HrisSpace.s6),
+              maxWidth: 420,
+              padding: EdgeInsets.zero,
               child: AutofillGroup(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const BrandMark(size: BrandMarkSize.auth),
-                    const SizedBox(height: HrisSpace.s2),
-                    Text(
-                      'Employee time clock',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: HrisType.sm, color: t.muted, height: 1.4),
-                    ),
-                    const SizedBox(height: HrisSpace.s4),
-                    SegmentedButton<AppEnv>(
-                      segments: [for (final e in envs) ButtonSegment(value: e, label: Text(e.label))],
-                      selected: {selected},
-                      showSelectedIcon: false,
-                      onSelectionChanged: _busy ? null : (s) => session.switchEnv(s.first),
-                    ),
-                    const SizedBox(height: HrisSpace.s4),
-                    if (reason != null && !_dismissedReason) ...[
-                      MessageBanner.info(reason, onClose: () => setState(() => _dismissedReason = true)),
-                      const SizedBox(height: 12),
-                    ],
-                    if (_error != null) ...[
-                      MessageBanner.error(_error!),
-                      const SizedBox(height: 12),
-                    ],
-                    TextField(
-                      controller: _companyCode,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      autofillHints: const [AutofillHints.organizationName],
-                      decoration: InputDecoration(
-                        labelText: 'Company or branch code',
-                        errorText: _fieldErrors['company_code'],
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(HrisSpace.s5, HrisSpace.s5, HrisSpace.s5, HrisSpace.s4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const BrandMark(),
+                          const SizedBox(height: HrisSpace.s4),
+                          Text(
+                            'Employee time clock',
+                            style: TextStyle(fontSize: HrisType.heading, fontWeight: HrisType.semibold, color: t.text, height: 28 / 20),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _identifier,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.username],
-                      decoration: InputDecoration(
-                        labelText: 'Username or email',
-                        errorText: _fieldErrors['identifier'],
+                    Divider(height: 1, color: t.border),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(HrisSpace.s5, HrisSpace.s5, HrisSpace.s5, HrisSpace.s4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SegmentedButton<AppEnv>(
+                            segments: [for (final e in envs) ButtonSegment(value: e, label: Text(e.label))],
+                            selected: {selected},
+                            showSelectedIcon: false,
+                            onSelectionChanged: _busy ? null : (s) => session.switchEnv(s.first),
+                          ),
+                          const SizedBox(height: HrisSpace.s4),
+                          if (reason != null && !_dismissedReason) ...[
+                            MessageBanner.info(reason, onClose: () => setState(() => _dismissedReason = true)),
+                            const SizedBox(height: 12),
+                          ],
+                          if (_error != null) ...[
+                            MessageBanner.error(_error!),
+                            const SizedBox(height: 12),
+                          ],
+                          TextField(
+                            controller: _companyCode,
+                            textInputAction: TextInputAction.next,
+                            autocorrect: false,
+                            autofillHints: const [AutofillHints.organizationName],
+                            decoration: InputDecoration(
+                              labelText: 'Company or branch code',
+                              errorText: _fieldErrors['company_code'],
+                            ),
+                          ),
+                          const SizedBox(height: HrisSpace.s4),
+                          TextField(
+                            controller: _identifier,
+                            textInputAction: TextInputAction.next,
+                            autocorrect: false,
+                            keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [AutofillHints.username],
+                            decoration: InputDecoration(
+                              labelText: 'Username or email',
+                              errorText: _fieldErrors['identifier'],
+                            ),
+                          ),
+                          const SizedBox(height: HrisSpace.s4),
+                          TextField(
+                            controller: _password,
+                            obscureText: _obscure,
+                            textInputAction: TextInputAction.done,
+                            autofillHints: const [AutofillHints.password],
+                            onSubmitted: (_) => _busy ? null : _submit(),
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              errorText: _fieldErrors['password'],
+                              suffixIcon: IconButton(
+                                tooltip: _obscure ? 'Show password' : 'Hide password',
+                                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                                onPressed: () => setState(() => _obscure = !_obscure),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          FilledButton(
+                            onPressed: _busy ? null : _submit,
+                            child: _busy
+                                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
+                                : const Text('Sign in'),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: _busy ? null : () => EnvSettingsSheet.show(context),
+                            child: const Text('Advanced…'),
+                          ),
+                          const SizedBox(height: HrisSpace.s1),
+                          Text(
+                            envStore.config.baseUrl,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontFamily: HrisFont.mono, fontSize: HrisType.xs, color: t.muted, height: 16 / 12),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _password,
-                      obscureText: _obscure,
-                      textInputAction: TextInputAction.done,
-                      autofillHints: const [AutofillHints.password],
-                      onSubmitted: (_) => _busy ? null : _submit(),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        errorText: _fieldErrors['password'],
-                        suffixIcon: IconButton(
-                          tooltip: _obscure ? 'Show password' : 'Hide password',
-                          icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                          onPressed: () => setState(() => _obscure = !_obscure),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton(
-                      onPressed: _busy ? null : _submit,
-                      child: _busy
-                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
-                          : const Text('Sign in'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _busy ? null : () => EnvSettingsSheet.show(context),
-                      child: const Text('Advanced…'),
-                    ),
-                    const SizedBox(height: HrisSpace.s2),
-                    Text(
-                      envStore.config.baseUrl,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: HrisType.xs, color: t.muted, height: 1.4),
                     ),
                   ],
                 ),

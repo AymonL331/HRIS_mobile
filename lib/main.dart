@@ -26,9 +26,11 @@ import 'features/reminders/reminder_tap_relay.dart';
 import 'features/reminders/reminders_api.dart';
 import 'features/time_clock/clock_api.dart';
 import 'features/tracking/tracking_service.dart';
+import 'shared/font_license.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerFontLicenses();
 
   final envStore = EnvStore();
   await envStore.load();

@@ -45,7 +45,9 @@ class BrandMark extends StatelessWidget {
             fontWeight: HrisType.semibold,
             height: 1.2,
             color: t.text,
-            letterSpacing: fontSize * (auth ? 0.04 : 0.05),
+            // The web wordmark carries no tracking (the only letter-spacing the
+            // web keeps is its caps section labels).
+            letterSpacing: 0,
           ),
         ),
       ],

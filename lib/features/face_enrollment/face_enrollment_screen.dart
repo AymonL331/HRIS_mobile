@@ -221,12 +221,19 @@ class _ConsentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.face_outlined, size: 40, color: t.primary),
+          Center(
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: t.primarySoft, borderRadius: BorderRadius.circular(HrisRadius.control)),
+              child: Icon(Icons.face_outlined, size: 22, color: t.primaryText),
+            ),
+          ),
           const SizedBox(height: HrisSpace.s3),
           Text(
             'Enroll your face',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: HrisType.heading, fontWeight: HrisType.semibold, height: 1.25, color: t.text),
+            style: TextStyle(fontSize: HrisType.heading, fontWeight: HrisType.semibold, height: 28 / 20, color: t.text),
           ),
           const SizedBox(height: HrisSpace.s3),
           Text(
@@ -235,34 +242,36 @@ class _ConsentCard extends StatelessWidget {
             'You will blink or turn your head when asked, then look straight at the camera. The app keeps a '
             'face fingerprint and one photo of that moment, and sends both to HR. HR compares the photo with '
             'your profile before approving — until then, your current face (if any) stays in use.',
-            style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.text),
+            style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
           ),
           if (passExpiresAt != null) ...[
             const SizedBox(height: HrisSpace.s2),
             Text(
               'Available until ${ManilaTime.dateTime(passExpiresAt!)}.',
-              style: TextStyle(fontSize: HrisType.xs, height: 1.4, color: t.muted),
+              style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2),
             ),
           ],
           const SizedBox(height: HrisSpace.s3),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s3, vertical: HrisSpace.s2),
+            // The legal note: the web's sunken box, 1px border, radius 4.
+            padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s3, vertical: 10),
             decoration: BoxDecoration(
-              color: Color.alphaBlend(t.hover, t.surface),
-              borderRadius: BorderRadius.circular(HrisRadius.sm),
+              color: t.surfaceSunken,
+              border: Border.all(color: t.border),
+              borderRadius: BorderRadius.circular(HrisRadius.control),
             ),
             child: Text(
               'By continuing you consent to your employer collecting your facial fingerprint and one photo for '
               'timekeeping (Data Privacy Act of 2012, RA 10173). Both are stored encrypted and seen only by HR; '
               'the photo is kept while this enrollment is in use and deleted when it is replaced or removed. To '
               'withdraw your consent, ask HR.',
-              style: TextStyle(fontSize: HrisType.xs, height: 1.45, color: t.muted),
+              style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, color: t.text2),
             ),
           ),
           const SizedBox(height: HrisSpace.s5),
           FilledButton(
             onPressed: onAgree,
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             child: const Text('I agree — enroll my face'),
           ),
         ],
@@ -284,7 +293,7 @@ class _WorkingCard extends StatelessWidget {
       children: [
         const CircularProgressIndicator(),
         const SizedBox(height: HrisSpace.s4),
-        Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: HrisType.sm, color: t.muted)),
+        Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2)),
       ],
     );
   }
@@ -305,19 +314,26 @@ class _DoneCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.task_alt_outlined, size: 40, color: t.primary),
+          Center(
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: t.primarySoft, borderRadius: BorderRadius.circular(HrisRadius.control)),
+              child: Icon(Icons.task_alt_outlined, size: 22, color: t.primaryText),
+            ),
+          ),
           const SizedBox(height: HrisSpace.s3),
           Text(
             'Sent to HR for review',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
+            style: TextStyle(fontSize: HrisType.heading, fontWeight: HrisType.semibold, height: 28 / 20, color: t.text),
           ),
           const SizedBox(height: HrisSpace.s2),
           Text(
             'HR will compare your photo with your profile. Once they approve it, you can clock in and out with '
             'your face on this phone.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
+            style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
           ),
           const SizedBox(height: HrisSpace.s5),
           FilledButton(
@@ -347,18 +363,25 @@ class _ClosedCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.lock_clock_outlined, size: 40, color: t.muted),
+          Center(
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: t.neutral.bg, borderRadius: BorderRadius.circular(HrisRadius.control)),
+              child: Icon(Icons.lock_clock_outlined, size: 22, color: t.text2),
+            ),
+          ),
           const SizedBox(height: HrisSpace.s3),
           Text(
             'Face enrollment is not available',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
+            style: TextStyle(fontSize: HrisType.heading, fontWeight: HrisType.semibold, height: 28 / 20, color: t.text),
           ),
           const SizedBox(height: HrisSpace.s2),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
+            style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
           ),
           const SizedBox(height: HrisSpace.s5),
           FilledButton(
@@ -381,8 +404,8 @@ class _FailedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A plain card with the error banner, as the web: one red element, not two.
     return AppCard(
-      tone: AppCardTone.danger,
       maxWidth: 440,
       centered: true,
       child: Column(

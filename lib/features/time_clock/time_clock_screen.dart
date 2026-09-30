@@ -277,16 +277,17 @@ class _Header extends StatelessWidget {
     return AppCard(
       maxWidth: 440,
       centered: true,
-      padding: const EdgeInsets.all(HrisSpace.s6),
+      padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s5, HrisSpace.s4, HrisSpace.s5),
+      // The web portal clock: the person, then a 36px clock over the date.
       child: Column(
         children: [
           Text(
             name.isEmpty ? 'Employee' : name,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: HrisType.lg,
+              fontSize: HrisType.md,
               fontWeight: HrisType.semibold,
-              height: 1.3,
+              height: 24 / 16,
               color: t.text,
             ),
           ),
@@ -295,35 +296,35 @@ class _Header extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: HrisType.sm,
-              height: 1.4,
-              color: t.muted,
+              height: 20 / 14,
+              color: t.text2,
             ),
           ),
-          const SizedBox(height: HrisSpace.s4),
+          const SizedBox(height: HrisSpace.s3),
           Text(
             ManilaTime.timeWithSeconds(nowUtc),
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: HrisType.stat,
+              fontSize: HrisType.clock,
               fontWeight: HrisType.semibold,
-              height: 1.15,
+              height: 44 / 36,
               color: t.text,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: HrisSpace.s1),
           Text(
             ManilaTime.clock(nowUtc),
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.text),
+            style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text),
           ),
+          const SizedBox(height: 2),
           Text(
             'Server time (Manila)',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: HrisType.xs,
-              height: 1.4,
-              color: t.muted,
+              height: 16 / 12,
+              color: t.text2,
             ),
           ),
         ],
@@ -344,24 +345,25 @@ class _TodayCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Sentence case, as the web strip (the web dropped caps styling).
           Text(
-            label.toUpperCase(),
+            label,
             style: TextStyle(
-              fontSize: HrisType.xxs,
-              fontWeight: HrisType.semibold,
-              height: 1.2,
-              color: t.muted,
-              letterSpacing: HrisType.xxs * 0.05,
+              fontSize: HrisType.xs,
+              fontWeight: HrisType.medium,
+              height: 16 / 12,
+              color: t.text2,
             ),
           ),
-          const SizedBox(height: HrisSpace.s1),
+          const SizedBox(height: 2),
           Text(
             at == null ? '—' : ManilaTime.time(at),
             style: TextStyle(
-              fontSize: HrisType.lg,
+              fontSize: HrisType.md,
               fontWeight: HrisType.semibold,
-              height: 1.3,
+              height: 24 / 16,
               color: at == null ? t.muted : t.text,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -378,7 +380,7 @@ class _TodayCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: HrisType.md,
                   fontWeight: HrisType.semibold,
-                  height: 1.35,
+                  height: 24 / 16,
                   color: t.text,
                 ),
               ),
@@ -387,18 +389,27 @@ class _TodayCard extends StatelessWidget {
                 ManilaTime.shortDate(status.localDate),
                 style: TextStyle(
                   fontSize: HrisType.sm,
-                  height: 1.4,
-                  color: t.muted,
+                  height: 20 / 14,
+                  color: t.text2,
                 ),
               ),
             ],
           ),
           const SizedBox(height: HrisSpace.s3),
-          Row(
-            children: [
-              stamp('Time in', today?.clockInAt),
-              stamp('Time out', today?.clockOutAt),
-            ],
+          // The web's sunken figure strip.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s4, vertical: HrisSpace.s3),
+            decoration: BoxDecoration(
+              color: t.surfaceSunken,
+              border: Border.all(color: t.border),
+              borderRadius: BorderRadius.circular(HrisRadius.control),
+            ),
+            child: Row(
+              children: [
+                stamp('Time in', today?.clockInAt),
+                stamp('Time out', today?.clockOutAt),
+              ],
+            ),
           ),
           if (today?.status != null) ...[
             const SizedBox(height: HrisSpace.s3),
@@ -454,9 +465,10 @@ class _WorksiteCard extends StatelessWidget {
           'Out of range — ${range.distanceM} m from ${ws.branchName ?? 'the worksite'} (limit ${ws.radiusM} m).';
       set = t.warning;
     }
-    final pillBg = set?.bg ?? Color.alphaBlend(t.hover, t.surface);
-    final pillBorder = set?.border ?? t.border;
-    final pillText = set?.text ?? t.muted;
+    // As the web portal clock: the worksite line is plain text (no box) with a
+    // small square marker — green in range, amber out of range, grey otherwise.
+    final lineColor = set?.text ?? t.text2;
+    final markerColor = set?.solid ?? t.muted;
 
     return AppCard(
       padding: const EdgeInsets.all(HrisSpace.s4),
@@ -465,42 +477,51 @@ class _WorksiteCard extends StatelessWidget {
         children: [
           Icon(
             ws.configured ? Icons.place_outlined : Icons.location_searching,
-            color: set?.text ?? t.muted,
+            size: 20,
+            color: set?.text ?? t.text2,
           ),
           const SizedBox(width: HrisSpace.s3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: HrisSpace.s3,
-                    vertical: HrisSpace.s2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: pillBg,
-                    border: Border.all(color: pillBorder),
-                    borderRadius: BorderRadius.circular(HrisRadius.sm),
-                  ),
-                  child: Text(
-                    line,
-                    style: TextStyle(
-                      fontSize: HrisType.sm,
-                      fontWeight: HrisType.semibold,
-                      height: 1.4,
-                      color: pillText,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 7),
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(color: markerColor, borderRadius: BorderRadius.circular(1)),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: HrisSpace.s2),
+                    Expanded(
+                      child: Text(
+                        line,
+                        style: TextStyle(
+                          fontSize: HrisType.sm,
+                          fontWeight: set == null ? FontWeight.w400 : HrisType.medium,
+                          height: 20 / 14,
+                          color: lineColor,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 if (fix != null) ...[
-                  const SizedBox(height: HrisSpace.s1),
-                  Text(
-                    'GPS ±${fix.accuracyM.round()} m · ${_age(fix.at)}',
-                    style: TextStyle(
-                      fontSize: HrisType.xs,
-                      height: 1.4,
-                      color: t.muted,
+                  const SizedBox(height: 2),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 14),
+                    child: Text(
+                      'GPS ±${fix.accuracyM.round()} m · ${_age(fix.at)}',
+                      style: TextStyle(
+                        fontSize: HrisType.xs,
+                        height: 16 / 12,
+                        color: t.muted,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
                 ],
@@ -610,8 +631,8 @@ class _PunchButtons extends StatelessWidget {
                 phaseText,
                 style: TextStyle(
                   fontSize: HrisType.sm,
-                  height: 1.4,
-                  color: t.muted,
+                  height: 20 / 14,
+                  color: t.text2,
                 ),
               ),
             ],
@@ -636,18 +657,21 @@ class _OutcomeCard extends StatelessWidget {
 
   Widget _mark(BuildContext context, {required bool ok}) {
     final t = HrisTokens.of(context);
+    // The web kiosk's result mark: a 40px square, tinted, with its tone border.
+    final set = ok ? t.success : t.danger;
     return Center(
       child: Container(
-        width: HrisSpace.s6,
-        height: HrisSpace.s6,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: ok ? t.success.solid : t.danger.solid,
-          shape: BoxShape.circle,
+          color: set.bg,
+          border: Border.all(color: set.border),
+          borderRadius: BorderRadius.circular(HrisRadius.control),
         ),
         child: Icon(
           ok ? Icons.check : Icons.priority_high,
-          size: 20,
-          color: t.primaryContrast,
+          size: 22,
+          color: set.text,
         ),
       ),
     );
@@ -730,8 +754,8 @@ class _LoadError extends StatelessWidget {
             minHeight: constraints.maxHeight - HrisSpace.s4 * 2,
           ),
           child: Center(
+            // A plain card with the error banner, as the web: one red element, not two.
             child: AppCard(
-              tone: AppCardTone.danger,
               maxWidth: 440,
               centered: true,
               child: Column(
@@ -868,21 +892,28 @@ class _NotEnrolled extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      icon,
-                      size: 40,
-                      color: (state.canEnroll && !_photoStep) || _photoFirst
-                          ? t.primary
-                          : t.muted,
-                    ),
+                    // The web gate's mark: petrol when there is something to do,
+                    // neutral while waiting on HR.
+                    Builder(builder: (_) {
+                      final active = (state.canEnroll && !_photoStep) || _photoFirst;
+                      return Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: active ? t.primarySoft : t.neutral.bg,
+                          borderRadius: BorderRadius.circular(HrisRadius.control),
+                        ),
+                        child: Icon(icon, size: 22, color: active ? t.primaryText : t.text2),
+                      );
+                    }),
                     const SizedBox(height: HrisSpace.s3),
                     Text(
                       title,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: HrisType.lg,
+                        fontSize: HrisType.heading,
                         fontWeight: HrisType.semibold,
-                        height: 1.3,
+                        height: 28 / 20,
                         color: t.text,
                       ),
                     ),
@@ -892,8 +923,8 @@ class _NotEnrolled extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: HrisType.sm,
-                        height: 1.5,
-                        color: t.muted,
+                        height: 20 / 14,
+                        color: t.text2,
                       ),
                     ),
                     if (_photoWaiting) ...[
@@ -908,7 +939,7 @@ class _NotEnrolled extends StatelessWidget {
                       FilledButton.icon(
                         onPressed: onOpenProfilePhoto,
                         style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
+                          minimumSize: const Size.fromHeight(48),
                         ),
                         icon: const Icon(Icons.photo_camera_outlined),
                         label: const Text('Open Profile Photo'),

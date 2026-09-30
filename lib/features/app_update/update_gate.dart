@@ -63,9 +63,17 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(HrisSpace.s3),
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: AppCard(child: _UpdateBody(controller: c, required: false)),
+                // Floats over the page, so it takes the web overlay shadow (the
+                // only place the web allows one: menus, toasts, sheets).
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(HrisRadius.panel),
+                    boxShadow: HrisTokens.of(context).shadowOverlay,
+                  ),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: AppCard(child: _UpdateBody(controller: c, required: false)),
+                  ),
                 ),
               ),
             ),
@@ -95,7 +103,15 @@ class _UpdateRequiredScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(Icons.system_update_outlined, size: 40, color: t.primary),
+                  // The web gate's mark: a small icon on a soft petrol square.
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(color: t.primarySoft, borderRadius: BorderRadius.circular(HrisRadius.control)),
+                      child: Icon(Icons.system_update_outlined, size: 22, color: t.primaryText),
+                    ),
+                  ),
                   const SizedBox(height: HrisSpace.s3),
                   _UpdateBody(controller: controller, required: true),
                 ],
@@ -119,8 +135,10 @@ class _UpdateBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
     final r = controller.release!;
-    final titleStyle = TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, color: t.text);
-    final bodyStyle = TextStyle(fontSize: HrisType.sm, height: 1.45, color: t.muted);
+    final titleStyle = required
+        ? TextStyle(fontSize: HrisType.heading, fontWeight: HrisType.semibold, height: 28 / 20, color: t.text)
+        : TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text);
+    final bodyStyle = TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2);
 
     final (String title, String body) = switch (controller.phase) {
       UpdatePhase.downloading => (
@@ -160,7 +178,19 @@ class _UpdateBody extends StatelessWidget {
           const SizedBox(height: HrisSpace.s3),
           LinearProgressIndicator(value: controller.progress > 0 ? controller.progress : null),
         ],
-        if (!busy) ...[
+        // Required: one full-width primary action, as the web gate. Optional:
+        // Later + Update at the end of the row.
+        if (!busy && required) ...[
+          const SizedBox(height: HrisSpace.s4),
+          if (controller.phase == UpdatePhase.needsPermission)
+            FilledButton(onPressed: controller.openInstallSettings, child: const Text('Open settings'))
+          else
+            FilledButton(
+              onPressed: controller.startUpdate,
+              child: Text(controller.phase == UpdatePhase.failed ? 'Try again' : 'Update now'),
+            ),
+        ],
+        if (!busy && !required) ...[
           const SizedBox(height: HrisSpace.s3),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,

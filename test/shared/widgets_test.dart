@@ -29,7 +29,7 @@ void main() {
       await mount(tester, const StatusBadge('OB', tone: StatusTone.info));
       expect(badgeBg(tester), t.info.bg);
       await mount(tester, const StatusBadge('No record'));
-      expect(tester.widget<Text>(find.text('No record')).style!.color, t.muted);
+      expect(tester.widget<Text>(find.text('No record')).style!.color, t.neutral.text);
     });
 
     testWidgets('dark mode uses the dark set', (tester) async {
@@ -44,8 +44,8 @@ void main() {
       expect(dtrDayTone('absent', 'absent'), StatusTone.danger);
       expect(dtrDayTone('on_leave', null), StatusTone.success);
       expect(dtrDayTone('holiday', null), StatusTone.info);
-      expect(dtrDayTone('rest_day', null), StatusTone.neutral);
-      expect(dtrDayTone('no_record', null), StatusTone.neutral);
+      expect(dtrDayTone('rest_day', null), StatusTone.quiet);
+      expect(dtrDayTone('no_record', null), StatusTone.quiet);
       expect(dtrFlagTone('undertime'), StatusTone.warning);
       expect(dtrFlagTone('half_day'), StatusTone.info);
       expect(captureMethodTone('mobile'), StatusTone.info);

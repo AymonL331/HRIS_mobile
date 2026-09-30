@@ -88,9 +88,10 @@ class SetupWizardScreen extends StatelessWidget {
       },
       child: Scaffold(
         body: SafeArea(
-          child: Center(
+          child: Align(
+            alignment: Alignment.topCenter,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(HrisSpace.s4),
+              padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s5, HrisSpace.s4, HrisSpace.s6),
               child: AppCard(
                 maxWidth: 440,
                 padding: const EdgeInsets.all(HrisSpace.s5),
@@ -104,9 +105,8 @@ class SetupWizardScreen extends StatelessWidget {
                           IconButton(
                             tooltip: 'Back',
                             onPressed: onBack,
-                            visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            constraints: const BoxConstraints(minWidth: HrisSize.touch, minHeight: HrisSize.touch),
                             icon: Icon(Icons.arrow_back, color: t.text),
                           ),
                           const SizedBox(width: HrisSpace.s1),
@@ -116,26 +116,36 @@ class SetupWizardScreen extends StatelessWidget {
                             'PHONE SETUP · STEP ${step.number} OF ${SetupStep.total}',
                             style: TextStyle(
                               fontSize: HrisType.xxs,
-                              letterSpacing: 0.6,
+                              letterSpacing: HrisType.xxs * 0.04,
                               fontWeight: HrisType.semibold,
-                              color: t.muted,
+                              height: 16 / 12,
+                              color: t.text2,
                             ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: HrisSpace.s2),
+                    // The web's thin track: 4px, square-ended (radius 2).
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(HrisRadius.pill),
+                      borderRadius: BorderRadius.circular(HrisRadius.badge),
                       child: LinearProgressIndicator(
                         value: step.number / SetupStep.total,
-                        minHeight: 6,
+                        minHeight: 4,
                         backgroundColor: t.border,
                         color: t.primary,
                       ),
                     ),
                     const SizedBox(height: HrisSpace.s5),
-                    Icon(c.icon, size: 44, color: t.primary),
+                    // The web location gate's mark: the icon on a soft petrol square.
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(color: t.primarySoft, borderRadius: BorderRadius.circular(HrisRadius.control)),
+                        child: Icon(c.icon, size: 22, color: t.primaryText),
+                      ),
+                    ),
                     const SizedBox(height: HrisSpace.s3),
                     Text(
                       c.title,
@@ -143,15 +153,15 @@ class SetupWizardScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: HrisType.heading,
                         fontWeight: HrisType.semibold,
-                        height: 1.25,
+                        height: 28 / 20,
                         color: t.text,
                       ),
                     ),
-                    const SizedBox(height: HrisSpace.s3),
+                    const SizedBox(height: HrisSpace.s2),
                     Text(
                       c.intro,
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
+                      style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
                     ),
                     if (banner != null) ...[const SizedBox(height: HrisSpace.s4), banner],
                     if (c.illustration != null) ...[
@@ -163,7 +173,7 @@ class SetupWizardScreen extends StatelessWidget {
                       const SizedBox(height: HrisSpace.s2),
                       Text(
                         c.note!,
-                        style: TextStyle(fontSize: HrisType.xs, height: 1.45, color: t.muted),
+                        style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, color: t.text2),
                       ),
                     ],
                     const SizedBox(height: HrisSpace.s5),
@@ -368,7 +378,7 @@ class _NumberedSteps extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
-    final base = TextStyle(fontSize: HrisType.sm, height: 1.4, color: t.text);
+    final base = TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -378,14 +388,20 @@ class _NumberedSteps extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // The web's square step marker: soft petrol fill, 1px petrol-soft
+                // edge, a mono number in the text-safe petrol (readable in dark).
                 Container(
                   width: 22,
                   height: 22,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: t.primarySoft),
+                  decoration: BoxDecoration(
+                    color: t.primarySoft,
+                    border: Border.all(color: t.primary.withValues(alpha: 0.35)),
+                    borderRadius: BorderRadius.circular(HrisRadius.badge),
+                  ),
                   child: Text(
                     '${i + 1}',
-                    style: TextStyle(fontSize: HrisType.xs, fontWeight: HrisType.semibold, color: t.primary),
+                    style: TextStyle(fontFamily: HrisFont.mono, fontSize: HrisType.xs, fontWeight: HrisType.semibold, color: t.primaryText),
                   ),
                 ),
                 const SizedBox(width: 10),

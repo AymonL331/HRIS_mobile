@@ -26,19 +26,25 @@ class NoEmployeeScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.admin_panel_settings_outlined, size: 40, color: t.muted),
+              // The icon as the web's neutral gate mark.
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: t.neutral.bg, borderRadius: BorderRadius.circular(HrisRadius.control)),
+                child: Icon(Icons.admin_panel_settings_outlined, size: 22, color: t.text2),
+              ),
               const SizedBox(height: HrisSpace.s3),
               Text(
                 'No employee record',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: HrisType.lg, fontWeight: HrisType.semibold, height: 1.3, color: t.text),
+                style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text),
               ),
-              const SizedBox(height: HrisSpace.s2),
+              const SizedBox(height: HrisSpace.s1),
               Text(
                 'This login is not linked to an employee, so there is no $what to show. '
                 'The time clock is for employee accounts; this account can still use Settings.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: HrisType.sm, height: 1.5, color: t.muted),
+                style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
               ),
             ],
           ),

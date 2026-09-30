@@ -74,8 +74,9 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
+    // The web sidebar: nav-bg (the sunken surface), one rule on its edge.
     return Drawer(
-      backgroundColor: t.surface,
+      backgroundColor: t.surfaceSunken,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: Border(right: BorderSide(color: t.border)),
@@ -86,7 +87,7 @@ class AppDrawer extends StatelessWidget {
             // .brand — the top-bar height, the brand row, one hairline under it.
             Container(
               height: HrisSize.topBar,
-              padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s5),
+              padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s4),
               decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: t.border)),
               ),
@@ -113,7 +114,7 @@ class AppDrawer extends StatelessWidget {
                           style: TextStyle(
                             fontSize: HrisType.sm,
                             fontWeight: HrisType.semibold,
-                            height: 1.35,
+                            height: 20 / 14,
                             color: t.text,
                           ),
                         ),
@@ -122,7 +123,7 @@ class AppDrawer extends StatelessWidget {
                             roleName!,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: HrisType.xxs, height: 1.4, color: t.muted),
+                            style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2),
                           ),
                       ],
                     ),
@@ -132,7 +133,7 @@ class AppDrawer extends StatelessWidget {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(HrisSpace.s3, HrisSpace.s3, HrisSpace.s3, HrisSpace.s5),
+                padding: const EdgeInsets.fromLTRB(HrisSpace.s2, HrisSpace.s3, HrisSpace.s2, HrisSpace.s5),
                 children: [
                   for (final section in sections) ...[
                     SectionLabel(
@@ -157,7 +158,7 @@ class AppDrawer extends StatelessWidget {
                 decoration: BoxDecoration(
                   border: Border(top: BorderSide(color: t.border)),
                 ),
-                padding: const EdgeInsets.all(HrisSpace.s3),
+                padding: const EdgeInsets.all(HrisSpace.s2),
                 child: _SignOutItem(
                   onTap: () {
                     Navigator.of(context).pop();
@@ -207,9 +208,9 @@ class _SignOutItem extends StatelessWidget {
       type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(HrisRadius.sm),
+        borderRadius: BorderRadius.circular(HrisRadius.control),
         child: Padding(
-          padding: const EdgeInsets.all(HrisSpace.s3),
+          padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s3, vertical: 14),
           child: Row(
             children: [
               Icon(Icons.logout, size: 20, color: t.danger.text),
@@ -219,8 +220,8 @@ class _SignOutItem extends StatelessWidget {
                   'Sign out',
                   style: TextStyle(
                     fontSize: HrisType.sm,
-                    fontWeight: FontWeight.w500,
-                    height: 1.35,
+                    fontWeight: HrisType.medium,
+                    height: 20 / 14,
                     color: t.danger.text,
                   ),
                 ),
@@ -244,38 +245,54 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
-    final fg = selected ? t.primary : t.text;
+    // Active = nav-active-bg + petrol marker + petrol text (the text-safe tint
+    // in dark, where the brand petrol is under 4.5:1 on the active fill).
+    final fg = selected ? t.primaryText : t.text;
     return Semantics(
       selected: selected,
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(HrisRadius.sm),
+          borderRadius: BorderRadius.circular(HrisRadius.control),
           child: Ink(
             decoration: BoxDecoration(
               color: selected ? t.primarySoft : Colors.transparent,
-              borderRadius: BorderRadius.circular(HrisRadius.sm),
+              borderRadius: BorderRadius.circular(HrisRadius.control),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(HrisSpace.s3),
-              child: Row(
-                children: [
-                  Icon(selected ? item.selectedIcon : item.icon, size: 20, color: selected ? t.primary : t.muted),
-                  const SizedBox(width: HrisSpace.s3),
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: HrisType.sm,
-                        fontWeight: selected ? HrisType.semibold : FontWeight.w500,
-                        height: 1.35,
-                        color: fg,
-                      ),
+            child: Stack(
+              children: [
+                if (selected)
+                  Positioned(
+                    left: 0,
+                    top: 12,
+                    bottom: 12,
+                    child: Container(
+                      width: 3,
+                      decoration: BoxDecoration(color: t.primaryText, borderRadius: BorderRadius.circular(1)),
                     ),
                   ),
-                ],
-              ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s3, vertical: 14),
+                  child: Row(
+                    children: [
+                      Icon(selected ? item.selectedIcon : item.icon, size: 20, color: selected ? t.primaryText : t.text2),
+                      const SizedBox(width: HrisSpace.s3),
+                      Expanded(
+                        child: Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: HrisType.sm,
+                            fontWeight: selected ? HrisType.semibold : HrisType.medium,
+                            height: 20 / 14,
+                            color: fg,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),

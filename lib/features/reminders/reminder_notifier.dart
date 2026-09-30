@@ -144,7 +144,8 @@ class LocalReminderNotifier implements ReminderNotifier {
             priority: urgent ? Priority.max : Priority.high,
             category: AndroidNotificationCategory.reminder,
             styleInformation: BigTextStyleInformation(body),
-            color: const Color(0xFF2563EB),
+            // Petrol, the brand accent (--primary).
+            color: const Color(0xFF0B5563),
             ticker: title,
           ),
         ),

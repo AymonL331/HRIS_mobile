@@ -8,9 +8,9 @@ void main() {
     test('light carries the web light tokens', () {
       final theme = buildTheme(Brightness.light);
       final t = theme.extension<HrisTokens>()!;
-      expect(t.bg, const Color(0xFFF1F5F9));
+      expect(t.bg, const Color(0xFFF7F7F6));
       expect(t.surface, const Color(0xFFFFFFFF));
-      expect(t.primary, const Color(0xFF2563EB));
+      expect(t.primary, const Color(0xFF0B5563));
       expect(theme.scaffoldBackgroundColor, t.bg);
       expect(theme.colorScheme.primary, t.primary);
       expect(theme.colorScheme.error, t.danger.solid);
@@ -21,20 +21,20 @@ void main() {
       final theme = buildTheme(Brightness.dark);
       final t = theme.extension<HrisTokens>()!;
       expect(theme.brightness, Brightness.dark);
-      expect(t.bg, const Color(0xFF0F172A));
-      expect(t.surface, const Color(0xFF1E293B));
-      expect(t.primary, const Color(0xFF3B82F6));
+      expect(t.bg, const Color(0xFF0F1416));
+      expect(t.surface, const Color(0xFF171C1E));
+      expect(t.primary, const Color(0xFF137A8C));
       expect(theme.scaffoldBackgroundColor, t.bg);
     });
 
     test('the type scale is the web scale', () {
       final text = buildTheme().textTheme;
-      expect(text.bodyMedium!.fontSize, 14.4);
-      expect(text.bodyLarge!.fontSize, 15.2);
-      expect(text.headlineSmall!.fontSize, 22.4);
+      expect(text.bodyMedium!.fontSize, 14.0);
+      expect(text.bodyLarge!.fontSize, 16.0);
+      expect(text.headlineSmall!.fontSize, 24.0);
       expect(text.headlineSmall!.fontWeight, FontWeight.w600);
-      expect(text.labelSmall!.fontSize, 11.52);
-      expect(text.displaySmall!.fontSize, 28.8);
+      expect(text.labelSmall!.fontSize, 12.0);
+      expect(text.displaySmall!.fontSize, 24.0);
     });
 
     test('the no-arg call is the light theme', () {

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/time/manila_time.dart';
+import '../../shared/button_styles.dart';
 import '../../shared/tokens.dart';
-import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/message_banner.dart';
 import '../../shared/widgets/status_badge.dart';
 import 'notification_display.dart';
@@ -59,7 +59,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         content: const Text('It leaves your inbox here and on the website. Removing it does not count as a response.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: HrisButtonStyles.danger(ctx),
+            child: const Text('Remove'),
+          ),
         ],
       ),
     );
@@ -95,43 +99,70 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (c.items.isEmpty && c.error == null)
-              Padding(
-                padding: const EdgeInsets.only(top: HrisSpace.s6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s5, vertical: HrisSpace.s6),
+                decoration: BoxDecoration(
+                  color: t.surface,
+                  border: Border.all(color: t.border),
+                  borderRadius: BorderRadius.circular(HrisRadius.panel),
+                ),
                 child: Column(
                   children: [
-                    Icon(Icons.notifications_none, size: 40, color: t.muted),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(color: t.neutral.bg, borderRadius: BorderRadius.circular(HrisRadius.control)),
+                      child: Icon(Icons.notifications_none, size: 22, color: t.text2),
+                    ),
                     const SizedBox(height: HrisSpace.s3),
-                    Text('No reminders', style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, color: t.text)),
+                    Text('No reminders', style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text)),
                     const SizedBox(height: HrisSpace.s1),
                     Text(
                       'Clock-in and clock-out reminders set by HR will show here.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: HrisType.sm, color: t.muted),
+                      style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2),
                     ),
                   ],
                 ),
               ),
-            for (final n in c.items) ...[
-              Dismissible(
-                key: ValueKey('notification-${n.id}'),
-                direction: DismissDirection.endToStart,
-                confirmDismiss: (_) => _confirmRemove(),
-                onDismissed: (_) => c.remove(n.id).catchError((_) {}),
-                background: Container(
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: HrisSpace.s5),
-                  decoration: BoxDecoration(color: t.danger.bg, borderRadius: BorderRadius.circular(HrisRadius.md)),
-                  child: Icon(Icons.delete_outline, color: t.danger.text),
+            if (c.items.isNotEmpty)
+              Container(
+                decoration: BoxDecoration(
+                  color: t.surface,
+                  border: Border.all(color: t.border),
+                  borderRadius: BorderRadius.circular(HrisRadius.panel),
                 ),
-                child: _NotificationCard(
-                  notification: n,
-                  now: now,
-                  onTap: n.isRead ? null : () => c.markRead(n.id),
-                  onAcknowledge: () => _acknowledge(c, n),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(HrisRadius.panel - 1),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Each row captures its own notification, as before.
+                      for (final (i, n) in c.items.indexed) ...[
+                        if (i > 0) Divider(height: 1, thickness: 1, color: t.border),
+                        Dismissible(
+                          key: ValueKey('notification-${n.id}'),
+                          direction: DismissDirection.endToStart,
+                          confirmDismiss: (_) => _confirmRemove(),
+                          onDismissed: (_) => c.remove(n.id).catchError((_) {}),
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: HrisSpace.s5),
+                            color: t.danger.bg,
+                            child: Icon(Icons.delete_outline, color: t.danger.text),
+                          ),
+                          child: _NotificationCard(
+                            notification: n,
+                            now: now,
+                            onTap: n.isRead ? null : () => c.markRead(n.id),
+                            onAcknowledge: () => _acknowledge(c, n),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: HrisSpace.s3),
-            ],
           ],
         ),
       ),
@@ -156,8 +187,11 @@ class _NotificationCard extends StatelessWidget {
     final ack = ackStateOf(n, now);
     final when = relativeTime(n.createdAt, now, ManilaTime.dateTime);
 
-    return AppCard(
-      padding: EdgeInsets.zero,
+    // The web's notification row: the title (bold while unread) with the
+    // square unread marker, the tone tag under it, the message in the
+    // secondary colour, then the time and the response.
+    return Material(
+      color: t.surface,
       child: InkWell(
         onTap: onTap,
         child: Padding(
@@ -170,13 +204,13 @@ class _NotificationCard extends StatelessWidget {
                 children: [
                   if (!n.isRead)
                     Padding(
-                      padding: const EdgeInsets.only(top: 6, right: HrisSpace.s2),
+                      padding: const EdgeInsets.only(top: 7, right: HrisSpace.s2),
                       child: Semantics(
                         label: 'Unread',
                         child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(color: t.primary, shape: BoxShape.circle),
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(color: t.primaryText, borderRadius: BorderRadius.circular(1)),
                         ),
                       ),
                     ),
@@ -184,31 +218,30 @@ class _NotificationCard extends StatelessWidget {
                     child: Text(
                       plainText(n.title),
                       style: TextStyle(
-                        fontSize: HrisType.md,
-                        fontWeight: n.isRead ? FontWeight.w500 : HrisType.semibold,
-                        height: 1.3,
+                        fontSize: HrisType.sm,
+                        fontWeight: n.isRead ? HrisType.medium : HrisType.semibold,
+                        height: 20 / 14,
                         color: t.text,
                       ),
                     ),
                   ),
-                  if (tag != null) ...[
-                    const SizedBox(width: HrisSpace.s2),
-                    StatusBadge(tag, tone: statusToneOf(tone)),
-                  ],
                 ],
               ),
-              const SizedBox(height: HrisSpace.s2),
-              Text(plainText(n.message), style: TextStyle(fontSize: HrisType.sm, height: 1.45, color: t.text)),
-              const SizedBox(height: HrisSpace.s3),
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: HrisSpace.s3,
-                runSpacing: HrisSpace.s2,
-                children: [
-                  Text(when, style: TextStyle(fontSize: HrisType.xs, color: t.muted)),
-                  if (ack != null) _AckRow(state: ack, deadline: n.ackDeadlineAt, onAcknowledge: onAcknowledge),
-                ],
-              ),
+              if (tag != null) ...[
+                const SizedBox(height: HrisSpace.s1 + 2),
+                StatusBadge(tag, tone: statusToneOf(tone)),
+              ],
+              const SizedBox(height: HrisSpace.s1 + 2),
+              Text(plainText(n.message), style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2)),
+              const SizedBox(height: HrisSpace.s1),
+              Text(when, style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2)),
+              if (ack != null) ...[
+                const SizedBox(height: HrisSpace.s2),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _AckRow(state: ack, deadline: n.ackDeadlineAt, onAcknowledge: onAcknowledge),
+                ),
+              ],
             ],
           ),
         ),
@@ -235,7 +268,7 @@ class _AckRow extends StatelessWidget {
           const SizedBox(width: HrisSpace.s1),
           Text(
             state.late ? 'Acknowledged (late)' : 'Acknowledged',
-            style: TextStyle(fontSize: HrisType.xs, fontWeight: HrisType.semibold, color: state.late ? t.warning.text : t.success.text),
+            style: TextStyle(fontSize: HrisType.xs, fontWeight: HrisType.semibold, height: 16 / 12, color: state.late ? t.warning.text : t.success.text),
           ),
         ],
       );
@@ -250,13 +283,18 @@ class _AckRow extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (hint != null) ...[
-          Text(hint, style: TextStyle(fontSize: HrisType.xs, color: state.overdue ? t.danger.text : t.muted)),
+          Flexible(child: Text(hint, style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: state.overdue ? t.danger.text : t.text2))),
           const SizedBox(width: HrisSpace.s3),
         ],
-        FilledButton.tonal(
+        OutlinedButton.icon(
           onPressed: onAcknowledge,
-          style: FilledButton.styleFrom(visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: HrisType.xs)),
-          child: const Text("I've got this"),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: t.primaryText,
+            side: BorderSide(color: t.primaryText),
+            padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s3),
+          ),
+          icon: const Icon(Icons.check, size: 16),
+          label: const Text("I've got this"),
         ),
       ],
     );
