@@ -34,9 +34,16 @@ class EnvStore extends ChangeNotifier {
       storedSandbox = null;
       await prefs.remove(_kSandboxUrl);
     }
+    // Same for a stored MAIN override (2026-10-01): the hotspot IP and the
+    // Tailscale funnel were replaced by the permanent domain.
+    var storedMain = EnvConfig.normalizeUrl(prefs.getString(_kMainUrl) ?? '');
+    if (storedMain != null && EnvConfig.retiredMainUrls.contains(storedMain)) {
+      storedMain = null;
+      await prefs.remove(_kMainUrl);
+    }
     _config = EnvConfig(
       selected: selected,
-      mainUrl: EnvConfig.normalizeUrl(prefs.getString(_kMainUrl) ?? '') ?? EnvConfig.defaultMainUrl,
+      mainUrl: storedMain ?? EnvConfig.defaultMainUrl,
       sandboxUrl: storedSandbox ?? EnvConfig.defaultSandboxUrl,
     );
     _loaded = true;

@@ -50,6 +50,15 @@ class EnvConfig {
   static const retiredSandboxUrls = <String>[
     'https://turbine-chamomile-financial.ngrok-free.dev',
   ];
+
+  /// Main addresses this app USED to ship (or testers typed) that are now
+  /// retired — the hotspot IP and the Tailscale funnel, both replaced by the
+  /// permanent domain on 2026-10-01. Same rule as the sandbox list: a stored
+  /// override matching one is ignored and cleared on load.
+  static const retiredMainUrls = <String>[
+    'http://192.168.137.1:5000',
+    'https://desktop-eg1b53e.tail797ea0.ts.net:8443',
+  ];
   final AppEnv selected;
   final String mainUrl;
   final String sandboxUrl;
