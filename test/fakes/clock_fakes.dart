@@ -28,7 +28,7 @@ Map<String, dynamic> statusJson({
       'timezone': 'Asia/Manila',
       'local_date': '2026-09-11',
       'clock_date': '2026-09-11',
-      'employee': {'id': 2316, 'employee_code': 'EMP01670', 'first_name': 'Sofia', 'last_name': 'Sandbox', 'work_arrangement': 'field'},
+      'employee': {'id': 2316, 'employee_code': 'EMP01670', 'first_name': 'Sofia', 'last_name': 'Sandbox', 'work_arrangement': 'field', 'designation_name': 'HR Officer', 'branch_name': 'Head Office'},
       'today': today,
       'worksite': worksite
           ? {'branch_id': 1, 'branch_name': 'Head Office', 'configured': true, 'lat': 14.5513714, 'lng': 121.0175541, 'radius_m': 200, 'radius_is_default': true, 'enforcement': 'flag'}

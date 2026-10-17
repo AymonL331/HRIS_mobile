@@ -45,6 +45,7 @@ void main() {
     await mount(tester, FakeClockApi(), FakeFixService());
     expect(find.text('Sofia Sandbox'), findsOneWidget);
     expect(find.text('EMP01670'), findsOneWidget);
+    expect(find.text('HR Officer · Head Office'), findsOneWidget); // position · home branch
     expect(find.text('Server time (Manila)'), findsOneWidget);
     // The server clock keeps its seconds (user, 2026-09-18) — the fixture's
     // 00:12:33Z reads 8:12:3x AM in Manila as the test runs.
@@ -145,7 +146,7 @@ void main() {
     expect(find.textContaining('kept for 90 days'), findsOneWidget);
     expect(find.textContaining('may extend'), findsNothing);
     // And it must not promise a website withdrawal route that does not exist.
-    expect(find.textContaining('withdraw this consent from the HRIS website'), findsNothing);
+    expect(find.textContaining('withdraw this consent from the ATLAS website'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 

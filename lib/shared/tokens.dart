@@ -267,9 +267,10 @@ abstract final class HrisRadius {
   static const pill = 999.0; // avatars and the unread-count dot only
 }
 
-/// The families bundled in assets/fonts (IBM Plex, as the web).
+/// The families bundled in assets/fonts, as the web (2026-10-17, ATLAS): Instrument
+/// Sans for all text, IBM Plex Mono for codes, IDs and figures.
 abstract final class HrisFont {
-  static const sans = 'IBMPlexSans';
+  static const sans = 'InstrumentSans';
   static const mono = 'IBMPlexMono';
 }
 

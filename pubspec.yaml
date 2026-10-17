@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.10.1+34
+version: 1.11.0+35
 
 environment:
   sdk: ^3.13.3
@@ -97,25 +97,26 @@ flutter:
     # AI-generated sample face (from the Human library's own samples, no real
     # person) for the Sandbox face engine self-check.
     - assets/face/self-test.jpg
-    # The HRIS mark beside the wordmark (BrandMark): light and dark artwork.
-    - assets/brand/hris-icon-light.png
-    - assets/brand/hris-icon-dark.png
-    # The IBM Plex licence (SIL OFL 1.1), shown on the app's licences page
+    # The font licences (SIL OFL 1.1), shown on the app's licences page
     # (registered in main.dart).
     - assets/fonts/OFL.txt
+    - assets/fonts/OFL-InstrumentSans.txt
 
-  # The web's typefaces, bundled (not downloaded at runtime): IBM Plex Sans for
-  # all text, IBM Plex Mono for codes, IDs and figures. From IBM's official
-  # release (github.com/IBM/plex: @ibm/plex-sans@1.1.0, @ibm/plex-mono@2.5.0).
+  # The web's typefaces, bundled (not downloaded at runtime), as ATLAS
+  # (2026-10-17): Instrument Sans for all text (github.com/Instrument/instrument-sans,
+  # fonts/ttf), IBM Plex Mono for codes, IDs and figures (github.com/IBM/plex,
+  # @ibm/plex-mono@2.5.0).
   fonts:
-    - family: IBMPlexSans
+    - family: InstrumentSans
       fonts:
-        - asset: assets/fonts/IBMPlexSans-Regular.ttf
+        - asset: assets/fonts/InstrumentSans-Regular.ttf
           weight: 400
-        - asset: assets/fonts/IBMPlexSans-Medium.ttf
+        - asset: assets/fonts/InstrumentSans-Medium.ttf
           weight: 500
-        - asset: assets/fonts/IBMPlexSans-SemiBold.ttf
+        - asset: assets/fonts/InstrumentSans-SemiBold.ttf
           weight: 600
+        - asset: assets/fonts/InstrumentSans-Bold.ttf
+          weight: 700
     - family: IBMPlexMono
       fonts:
         - asset: assets/fonts/IBMPlexMono-Regular.ttf
@@ -156,10 +157,10 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# Launcher icon from the HRIS brand artwork (tool/brand/make_icons.ps1 builds the
-# sources from assets/brand/hris-icon-*-1024.png). Adaptive, full-bleed (no white
-# ground): the card's navy gradient as background, the person + lines as foreground,
-# and the same in white as the monochrome (themed icons, Android 13+).
+# Launcher icon = the ATLAS Meridian app tile (ATLAS Meridian Logo Guidelines,
+# 2026-10-17): legacy = the red rounded tile; adaptive = brand red background + the
+# white glyph in the 66 dp safe zone; monochrome = the same glyph (themed icons,
+# Android 13+). Rendered from the guideline geometry with headless Chrome.
 flutter_launcher_icons:
   android: true
   ios: false

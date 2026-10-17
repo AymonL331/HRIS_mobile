@@ -50,7 +50,7 @@ class BatteryWarningCard extends StatelessWidget {
                       ),
                       const SizedBox(height: HrisSpace.s1),
                       Text(
-                        'Your phone is allowed to stop HRIS in the background. When it does, your shift shows gaps you did not cause.',
+                        'Your phone is allowed to stop ATLAS in the background. When it does, your shift shows gaps you did not cause.',
                         style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, color: t.text2),
                       ),
                       const SizedBox(height: HrisSpace.s2),

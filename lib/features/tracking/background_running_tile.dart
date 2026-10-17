@@ -40,10 +40,10 @@ class BackgroundRunningTile extends StatelessWidget {
               title: const Text('Background running'),
               subtitle: Text(
                 allowed
-                    ? 'Allowed — your phone lets HRIS keep recording your location during a shift.'
+                    ? 'Allowed — your phone lets ATLAS keep recording your location during a shift.'
                     : unknown
                         ? 'Checking this phone…'
-                        : 'Not allowed — your phone may stop HRIS during a shift, leaving gaps in your record.',
+                        : 'Not allowed — your phone may stop ATLAS during a shift, leaving gaps in your record.',
               ),
               trailing: Text(
                 status,

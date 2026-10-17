@@ -127,7 +127,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               children: [
                 const MessageBanner.info(
                   'This password was set for you by HR. Choose your own before using the app — it is the '
-                  'same password as the HRIS website, so it changes there too.',
+                  'same password as the ATLAS website, so it changes there too.',
                 ),
                 const SizedBox(height: 16),
                 if (_error != null) ...[

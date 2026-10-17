@@ -104,7 +104,7 @@ void main() {
 
   testWidgets('switching to Sandbox changes the address the next login goes to', (tester) async {
     final b = await boot(tester, (_) async => http.Response(env(data: {'token': 'T', 'user': userJson()}), 200));
-    expect(find.text('http://192.168.137.1:5000'), findsOneWidget);
+    expect(find.text('https://atlas.monarch.ph'), findsOneWidget);
     await tester.tap(find.text('Sandbox'));
     await tester.pumpAndSettle();
     expect(find.text(EnvConfig.defaultSandboxUrl), findsOneWidget);
@@ -121,13 +121,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(EnvSettingsSheet), findsOneWidget);
 
-    await tester.enterText(find.widgetWithText(TextField, 'Main HRIS'), 'not a url');
+    await tester.enterText(find.widgetWithText(TextField, 'Main ATLAS'), 'not a url');
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(find.textContaining('starting with http://'), findsOneWidget);
-    expect(b.env.config.mainUrl, 'http://192.168.137.1:5000');
+    expect(b.env.config.mainUrl, 'https://atlas.monarch.ph');
 
-    await tester.enterText(find.widgetWithText(TextField, 'Main HRIS'), 'https://hris.example.com/');
+    await tester.enterText(find.widgetWithText(TextField, 'Main ATLAS'), 'https://hris.example.com/');
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(find.byType(EnvSettingsSheet), findsNothing);

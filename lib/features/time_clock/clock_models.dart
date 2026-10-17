@@ -6,6 +6,11 @@ import '../tracking/tracking_models.dart';
 int? _int(Object? v) => v == null ? null : (v is int ? v : int.tryParse('$v'));
 double? _num(Object? v) => v == null ? null : (v is num ? v.toDouble() : double.tryParse('$v'));
 bool _flag(Object? v) => v == true || v == 1 || v == '1';
+/// A trimmed name, or null when blank.
+String? _text(Object? v) {
+  final s = v?.toString().trim() ?? '';
+  return s.isEmpty ? null : s;
+}
 
 /// The branch worksite the geofence is judged against (`worksite` block).
 class Worksite {
@@ -126,6 +131,11 @@ class ClockStatus {
   final String clockDate;
   final String employeeName;
   final String employeeCode;
+
+  /// Position and home branch, shown under the name (2026-10-17). Null from a
+  /// server that does not send them yet, or when the record has none.
+  final String? designationName;
+  final String? branchName;
   final TodayPunches? today;
   final Worksite worksite;
   final bool consentGiven;
@@ -141,6 +151,8 @@ class ClockStatus {
     required this.clockDate,
     required this.employeeName,
     required this.employeeCode,
+    this.designationName,
+    this.branchName,
     required this.today,
     required this.worksite,
     required this.consentGiven,
@@ -168,6 +180,8 @@ class ClockStatus {
       clockDate: (j['clock_date'] ?? '') as String,
       employeeName: [emp['first_name'], emp['last_name']].whereType<String>().where((s) => s.isNotEmpty).join(' '),
       employeeCode: (emp['employee_code'] ?? '') as String,
+      designationName: _text(emp['designation_name']),
+      branchName: _text(emp['branch_name']),
       today: today is Map<String, dynamic> ? TodayPunches.fromJson(today) : null,
       worksite: Worksite.fromJson(j['worksite'] as Map<String, dynamic>?),
       consentGiven: _flag(consent['consent_given']),

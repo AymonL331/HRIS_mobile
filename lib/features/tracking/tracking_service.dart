@@ -80,7 +80,7 @@ class ForegroundTrackingService implements TrackingService {
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'work_location',
         channelName: 'Work location recording',
-        channelDescription: 'Shown while HRIS records your location between clock-in and clock-out.',
+        channelDescription: 'Shown while ATLAS records your location between clock-in and clock-out.',
         channelImportance: NotificationChannelImportance.LOW,
         priority: NotificationPriority.LOW,
         onlyAlertOnce: true,
@@ -140,7 +140,7 @@ class ForegroundTrackingService implements TrackingService {
         : await FlutterForegroundTask.startService(
             serviceId: 4217,
             serviceTypes: const [ForegroundServiceTypes.location],
-            notificationTitle: 'HRIS is recording your work location',
+            notificationTitle: 'ATLAS is recording your work location',
             notificationText: 'Since ${ManilaTime.time(since)}. Stops when you clock out.',
             callback: startTrackingCallback,
           );

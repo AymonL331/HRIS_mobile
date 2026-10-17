@@ -55,24 +55,25 @@ void main() {
   });
 
   group('BrandMark / UserAvatar', () {
-    testWidgets('the brand renders the word once, at either size', (tester) async {
+    testWidgets('the brand is named ATLAS once, and the word is DRAWN, never typed', (tester) async {
       await mount(tester, const BrandMark());
-      expect(find.text('HRIS'), findsOneWidget);
-      await mount(tester, const BrandMark(size: BrandMarkSize.auth));
-      expect(find.text('HRIS'), findsOneWidget);
-      expect(tester.widget<Text>(find.text('HRIS')).style!.fontSize, HrisType.xl);
+      expect(find.bySemanticsLabel('ATLAS'), findsOneWidget);
+      // The guidelines forbid setting "ATLAS" in a font beside the mark.
+      expect(find.text('ATLAS'), findsNothing);
+      expect(find.text('HRIS'), findsNothing);
+      expect(find.byType(Image), findsNothing);
     });
 
-    testWidgets('the mark sits LEFT of the word, and follows the theme (light / dark artwork)', (tester) async {
-      String asset() => (tester.widget<Image>(find.byType(Image)).image as AssetImage).assetName;
+    testWidgets('the mark sits LEFT of the wordmark, at the bar and sign-in sizes', (tester) async {
+      Finder word() => find.descendant(of: find.byType(Row), matching: find.byType(CustomPaint)).last;
       await mount(tester, const BrandMark());
-      expect(asset(), BrandMark.lightAsset);
-      expect(tester.getTopLeft(find.byType(Image)).dx, lessThan(tester.getTopLeft(find.text('HRIS')).dx));
-      expect(tester.getSize(find.byType(Image)), const Size(HrisSize.brandMark, HrisSize.brandMark));
+      expect(tester.getSize(find.byType(AtlasMark)), const Size(HrisSize.brandMark, HrisSize.brandMark));
+      expect(tester.getTopLeft(find.byType(AtlasMark)).dx, lessThan(tester.getTopLeft(word()).dx));
+      // The wordmark keeps the web's 90 × 24 proportions at half the mark's height.
+      expect(tester.getSize(word()), const Size(HrisSize.brandMark * 0.5 * 90 / 24, HrisSize.brandMark * 0.5));
       await mount(tester, const BrandMark(size: BrandMarkSize.auth), brightness: Brightness.dark);
-      await tester.pumpAndSettle(); // the theme change animates; read the settled theme
-      expect(asset(), BrandMark.darkAsset);
-      expect(tester.getSize(find.byType(Image)), const Size(HrisSize.brandMarkAuth, HrisSize.brandMarkAuth));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(find.byType(AtlasMark)), const Size(HrisSize.brandMarkAuth, HrisSize.brandMarkAuth));
     });
 
     testWidgets('the avatar shows the upper-cased first initial, ? when empty', (tester) async {

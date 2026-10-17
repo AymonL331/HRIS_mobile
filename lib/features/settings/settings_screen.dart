@@ -115,7 +115,7 @@ class SettingsScreen extends StatelessWidget {
               leading: Icon(Icons.password_outlined),
               title: Text('Password'),
               subtitle: Text(
-                'The same password as the HRIS website. To reset it, ask HR — they issue a temporary '
+                'The same password as the ATLAS website. To reset it, ask HR — they issue a temporary '
                 'password, and you choose your own the next time you sign in here or on the website.',
               ),
               isThreeLine: true,

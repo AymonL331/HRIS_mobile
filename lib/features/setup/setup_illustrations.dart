@@ -113,7 +113,7 @@ class PermissionDialogMock extends StatelessWidget {
         Icon(Icons.location_on_outlined, size: 22, color: t.primary),
         const SizedBox(height: 6),
         Text(
-          'Allow HRIS to access this device’s location?',
+          'Allow ATLAS to access this device’s location?',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.semibold, color: t.text),
         ),
@@ -243,7 +243,7 @@ class LocationPermissionPageMock extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(left: 24),
           child: Text(
-            'HRIS',
+            'ATLAS',
             style: TextStyle(fontSize: HrisType.xs, color: t.muted),
           ),
         ),

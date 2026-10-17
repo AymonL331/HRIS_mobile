@@ -88,7 +88,7 @@ class _EnvSettingsSheetState extends State<EnvSettingsSheet> {
           Text('Server addresses', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(
-            'Where the app finds the HRIS API. Only change these if IT gave you a new address.',
+            'Where the app finds the ATLAS API. Only change these if IT gave you a new address.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: HrisTokens.of(context).text2),
           ),
           const SizedBox(height: 20),
@@ -96,7 +96,7 @@ class _EnvSettingsSheetState extends State<EnvSettingsSheet> {
             controller: _main,
             keyboardType: TextInputType.url,
             autocorrect: false,
-            decoration: InputDecoration(labelText: 'Main HRIS', errorText: _mainError, hintText: 'https://…'),
+            decoration: InputDecoration(labelText: 'Main ATLAS', errorText: _mainError, hintText: 'https://…'),
           ),
           const SizedBox(height: 16),
           TextField(

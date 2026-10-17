@@ -213,7 +213,7 @@ class SetupWizardScreen extends StatelessWidget {
         return _StepContent(
           icon: Icons.location_off_outlined,
           title: 'Turn on location',
-          intro: "Your phone's location is switched off. HRIS records where you are while you are on duty, so it cannot run without it.",
+          intro: "Your phone's location is switched off. ATLAS records where you are while you are on duty, so it cannot run without it.",
           steps: const [
             'Tap **Open location settings**.',
             'Turn **Use location** ON.',
@@ -230,7 +230,7 @@ class SetupWizardScreen extends StatelessWidget {
           intro: 'When you tap Continue, Android asks for your location. Read this first — it looks like the picture below.',
           banner: refusedOnce
               ? const MessageBanner.error(
-                  'You tapped “Don’t allow”. HRIS cannot work without your location. Tap Continue again and choose “While using the app” or “Only this time”.',
+                  'You tapped “Don’t allow”. ATLAS cannot work without your location. Tap Continue again and choose “While using the app” or “Only this time”.',
                 )
               : null,
           illustration: const PermissionDialogMock(),
@@ -267,7 +267,7 @@ class SetupWizardScreen extends StatelessWidget {
             return _StepContent(
               icon: Icons.gps_not_fixed,
               title: 'Precise location is required',
-              intro: 'Location is set to “Approximate”, which is only good to a few kilometres. HRIS needs your exact position.',
+              intro: 'Location is set to “Approximate”, which is only good to a few kilometres. ATLAS needs your exact position.',
               illustration: const LocationPermissionPageMock(highlightAlways: false),
               steps: const [
                 'Tap **Open settings**.',
@@ -282,7 +282,7 @@ class SetupWizardScreen extends StatelessWidget {
             return _StepContent(
               icon: Icons.my_location,
               title: 'Set location to "Allow all the time"',
-              intro: 'Almost done. Android only offers “Allow all the time” in Settings, so HRIS opens that page for you. It looks like this:',
+              intro: 'Almost done. Android only offers “Allow all the time” in Settings, so ATLAS opens that page for you. It looks like this:',
               illustration: const LocationPermissionPageMock(),
               steps: const [
                 'Tap **Open settings**.',
@@ -300,10 +300,10 @@ class SetupWizardScreen extends StatelessWidget {
         return _StepContent(
           icon: Icons.notifications_active_outlined,
           title: 'Allow notifications',
-          intro: 'While you are clocked in, HRIS shows a notification that your work location is being recorded — so you always know when it is on, and when it stops.',
+          intro: 'While you are clocked in, ATLAS shows a notification that your work location is being recorded — so you always know when it is on, and when it stops.',
           illustration: const SimpleDialogMock(
             icon: Icons.notifications_outlined,
-            title: 'Allow HRIS to send you notifications?',
+            title: 'Allow ATLAS to send you notifications?',
             allow: 'Allow',
             deny: 'Don’t allow',
           ),
@@ -316,7 +316,7 @@ class SetupWizardScreen extends StatelessWidget {
         final hint = oemBatteryHint(device.manufacturer);
         return _StepContent(
           icon: Icons.battery_charging_full_outlined,
-          title: 'Let HRIS run in the background',
+          title: 'Let ATLAS run in the background',
           intro: 'To save battery, your phone may stop apps you are not looking at. That would stop your location being recorded during your shift.',
           illustration: const SimpleDialogMock(
             icon: Icons.battery_alert_outlined,

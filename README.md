@@ -35,7 +35,7 @@ token's `/api/me/` window.
 
 | Environment | Default address | Editable in app |
 |---|---|---|
-| Main HRIS | `http://192.168.137.1:5000` (the dev PC's hotspot, for now) | yes — Login › Advanced |
+| Main ATLAS | `https://atlas.monarch.ph` (Hostinger, since 2026-10-17) | yes — Login › Advanced |
 | Sandbox | `https://turbine-chamomile-financial.ngrok-free.dev` | yes |
 
 On the Android emulator, the host PC is `10.0.2.2`: set Sandbox to `http://10.0.2.2:5001`
@@ -209,7 +209,7 @@ undertime, mobile app, out of range). No coordinates are shown on the phone.
 Change the compiled defaults at build time:
 
 ```powershell
-flutter build apk --release --dart-define=HRIS_MAIN_URL=https://hris.example.com --dart-define=HRIS_SANDBOX_URL=https://sandbox.example.com
+flutter build apk --release --dart-define=HRIS_MAIN_URL=https://atlas.monarch.ph --dart-define=HRIS_SANDBOX_URL=https://sandbox.example.com
 ```
 
 Cleartext HTTP is allowed only for `192.168.137.1`, for `127.0.0.1`/`localhost` (the
@@ -242,7 +242,7 @@ phone's dark mode the way the website follows `prefers-color-scheme`. Shared wid
 under `lib/shared/widgets/` are the web components: `AppCard` (the bordered card with
 the soft shadow), `StatusBadge` (the five-tone pill, with the DTR tone mapping from
 `attendanceEnums.js`), `MessageBanner` (the alert with the left accent), `BrandMark`
-(the "● HRIS" mark), `UserAvatar`, `PageHeader` / `SectionLabel`. Read tokens through
+(the ATLAS Meridian mark + wordmark, drawn from the logo guidelines), `UserAvatar`, `PageHeader` / `SectionLabel`. Read tokens through
 `HrisTokens.of(context)`, never `extension<HrisTokens>()!` — the widget tests mount
 screens under a bare `MaterialApp`.
 
@@ -253,9 +253,10 @@ item in primary-soft with primary text (`.itemActive`). It replaced the three
 bottom tabs when My Payslips made a fourth destination: a tab bar stops scaling
 there, and the sidebar is the shape this product already has in the browser.
 
-The launcher icon and splash come from the same mark: `tool/brand/make_icons.ps1`
-draws the sources into `assets/brand/`, `dart run flutter_launcher_icons` builds the
-adaptive icon, and `android/app/src/main/res/values*/splash_colors.xml` carries the
+The launcher icon, notification icon and splash come from the ATLAS Meridian Logo
+Guidelines (hris/AtlasLogo): `bash tool/brand/make_icons.sh` (Git Bash, headless
+Chrome) renders them from the guideline drawings into `assets/brand/` and `res/`,
+`dart run flutter_launcher_icons` builds the adaptive icon, and `android/app/src/main/res/values*/splash_colors.xml` carries the
 page colour for both modes.
 
 ## Checks

@@ -55,7 +55,7 @@ class TrackingStatusCard extends StatelessWidget {
         if (snapshot.stopReason == 'could_not_start')
           'Android refused to start it. Check that location is set to "Allow all the time", then tap Restart.'
         else
-          'Tap Restart. If it keeps stopping, open the app settings and allow HRIS to run in the background.',
+          'Tap Restart. If it keeps stopping, open the app settings and allow ATLAS to run in the background.',
       ];
     }
 

@@ -20,7 +20,7 @@ class HrisApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'HRIS',
+      title: 'ATLAS',
       // Light and dark from the web tokens; the phone's setting decides, like
       // the website's prefers-color-scheme.
       theme: buildTheme(Brightness.light),

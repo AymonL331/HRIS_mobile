@@ -5,13 +5,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('EnvConfig', () {
-    test('defaults point Main at the hotspot and Sandbox at the Tailscale Funnel', () {
+    test('defaults point Main at atlas.monarch.ph and Sandbox at the Tailscale Funnel', () {
       const c = EnvConfig.defaults();
       expect(c.selected, AppEnv.main);
-      expect(c.baseUrl, 'http://192.168.137.1:5000');
+      expect(c.baseUrl, 'https://atlas.monarch.ph');
       // Permanent (this PC's name in the tailnet) — the reason it may be baked in.
       expect(c.copyWith(selected: AppEnv.sandbox).baseUrl, 'https://desktop-eg1b53e.tail797ea0.ts.net');
       expect(AppEnv.values, [AppEnv.main, AppEnv.sandbox]);
+    });
+
+    test('hris.suerteims.com (the PC tunnel) is RETIRED for Main, and the current default never is', () {
+      expect(EnvConfig.retiredMainUrls, contains('https://hris.suerteims.com'));
+      expect(EnvConfig.retiredMainUrls, isNot(contains(EnvConfig.defaultMainUrl)));
     });
 
     test('the dead ngrok host is a RETIRED default, and the current default never is', () {

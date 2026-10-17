@@ -9,7 +9,7 @@ enum AppEnv {
   sandbox;
 
   String get label => switch (this) {
-        AppEnv.main => 'Main HRIS',
+        AppEnv.main => 'Main ATLAS',
         AppEnv.sandbox => 'Sandbox',
       };
 
@@ -27,7 +27,7 @@ enum AppEnv {
 class EnvConfig {
   static const defaultMainUrl = String.fromEnvironment(
     'HRIS_MAIN_URL',
-    defaultValue: 'http://192.168.137.1:5000',
+    defaultValue: 'https://atlas.monarch.ph',
   );
   /// Tailscale Funnel on the development PC (2026-09-22). PERMANENT, unlike the
   /// ngrok / Cloudflare quick tunnels it replaces: the host is this machine's
@@ -58,6 +58,9 @@ class EnvConfig {
   static const retiredMainUrls = <String>[
     'http://192.168.137.1:5000',
     'https://desktop-eg1b53e.tail797ea0.ts.net:8443',
+    // The PC tunnel kept the old address alive after the move to Hostinger
+    // (2026-10-17); atlas.monarch.ph is the home now.
+    'https://hris.suerteims.com',
   ];
   final AppEnv selected;
   final String mainUrl;

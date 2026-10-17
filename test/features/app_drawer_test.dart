@@ -65,7 +65,7 @@ void main() {
     expect(find.text('My Payslips'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
     // The brand block, and who is signed in.
-    expect(find.text('HRIS'), findsOneWidget);
+    expect(find.bySemanticsLabel('ATLAS'), findsOneWidget);
     expect(find.text('sofia'), findsOneWidget);
     expect(find.text('Employee'), findsOneWidget);
   });

@@ -166,7 +166,7 @@ class _ExactAlarmSteps extends StatelessWidget {
           ),
         Padding(
           padding: const EdgeInsets.only(top: HrisSpace.s1),
-          child: Text('Then come back to HRIS — this row updates by itself.', style: style.copyWith(color: color)),
+          child: Text('Then come back to ATLAS — this row updates by itself.', style: style.copyWith(color: color)),
         ),
       ],
     );

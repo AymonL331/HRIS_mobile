@@ -196,6 +196,8 @@ class _TimeClockScreenState extends State<TimeClockScreen>
             _Header(
               name: status.employeeName,
               code: status.employeeCode,
+              designation: status.designationName,
+              branch: status.branchName,
               tenantName: tenant?.name,
               nowUtc: now,
             ),
@@ -262,11 +264,15 @@ class _TimeClockScreenState extends State<TimeClockScreen>
 class _Header extends StatelessWidget {
   final String name;
   final String code;
+  final String? designation;
+  final String? branch;
   final String? tenantName;
   final DateTime nowUtc;
   const _Header({
     required this.name,
     required this.code,
+    this.designation,
+    this.branch,
     required this.tenantName,
     required this.nowUtc,
   });
@@ -291,6 +297,18 @@ class _Header extends StatelessWidget {
               color: t.text,
             ),
           ),
+          // Position · branch, so the person at the camera sees whose account this is.
+          if (designation != null || branch != null)
+            Text(
+              [?designation, ?branch].join(' · '),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: HrisType.sm,
+                fontWeight: HrisType.medium,
+                height: 20 / 14,
+                color: t.text,
+              ),
+            ),
           Text(
             [if (code.isNotEmpty) code, ?tenantName].join(' · '),
             textAlign: TextAlign.center,

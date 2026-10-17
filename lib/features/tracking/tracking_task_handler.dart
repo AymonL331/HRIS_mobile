@@ -308,7 +308,7 @@ class TrackingTaskHandler extends TaskHandler {
       if (queued > 0) '$queued waiting to upload',
     ].join(' · ');
     await FlutterForegroundTask.updateService(
-      notificationTitle: 'HRIS is recording your work location',
+      notificationTitle: 'ATLAS is recording your work location',
       notificationText: text,
     );
     FlutterForegroundTask.sendDataToMain({

@@ -49,7 +49,7 @@ class ConsentScreen extends StatelessWidget {
             ),
             const SizedBox(height: HrisSpace.s3),
             Text(
-              'To use this app you must allow HRIS to access your location ALL THE TIME and with PRECISE '
+              'To use this app you must allow ATLAS to access your location ALL THE TIME and with PRECISE '
               'accuracy. That means the app is able to read where you are even when it is closed.\n\n'
               'While you are clocked in — from the moment you clock in until you clock out — the app records '
               'where you are every few minutes, even with the screen off, and shows a notification while it '

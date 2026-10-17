@@ -147,14 +147,14 @@ class _UpdateBody extends StatelessWidget {
         ),
       UpdatePhase.installing => ('Opening the installer…', 'Tap Update (or Install) on the screen Android shows next.'),
       UpdatePhase.needsPermission => (
-          'Allow HRIS to install its updates',
-          'Android asks this once. Turn on "Allow from this source" for HRIS, then come back to the app.',
+          'Allow ATLAS to install its updates',
+          'Android asks this once. Turn on "Allow from this source" for ATLAS, then come back to the app.',
         ),
       UpdatePhase.failed => ('The update did not finish', controller.error ?? 'Try again.'),
       UpdatePhase.idle => required
           ? (
               'Update required',
-              'This version of HRIS (${controller.currentVersionName}) is no longer supported. '
+              'This version of ATLAS (${controller.currentVersionName}) is no longer supported. '
                   'Install version ${r.versionName} (${r.sizeLabel}) to keep using the app.',
             )
           : ('Update available', 'Version ${r.versionName} is ready to install (${r.sizeLabel}).'),

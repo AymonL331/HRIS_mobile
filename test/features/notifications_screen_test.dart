@@ -189,7 +189,7 @@ void main() {
       expect(find.textContaining('Exact alarms are off'), findsOneWidget);
       expect(find.text('To allow exact alarms on your Samsung phone:'), findsOneWidget);
       expect(find.textContaining('Special access › Alarms and reminders'), findsOneWidget);
-      expect(find.textContaining('Find HRIS in the list'), findsOneWidget);
+      expect(find.textContaining('Find ATLAS in the list'), findsOneWidget);
       expect(find.text('Allow exact alarms'), findsNothing);
       expect(find.byType(OutlinedButton), findsNothing);
     });

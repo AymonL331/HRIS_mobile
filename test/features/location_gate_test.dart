@@ -295,7 +295,7 @@ void main() {
     await tapText(tester, 'Continue');
     expect(device.notificationRequests, 1);
 
-    expect(find.text('Let HRIS run in the background'), findsOneWidget);
+    expect(find.text('Let ATLAS run in the background'), findsOneWidget);
     expect(find.text('PHONE SETUP · STEP 5 OF 5'), findsOneWidget);
     await tapText(tester, 'Continue');
     expect(device.batteryRequests, 1);

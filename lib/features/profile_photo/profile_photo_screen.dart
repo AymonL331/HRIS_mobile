@@ -201,7 +201,7 @@ class _ProfilePhotoScreenState extends State<ProfilePhotoScreen> {
           if (_error != null) ...[MessageBanner.error(_error!), const SizedBox(height: HrisSpace.s3)],
           if (_cameraDenied) ...[
             const MessageBanner.warning(
-              'The camera is not allowed for HRIS. Allow it in Android settings to take a photo.',
+              'The camera is not allowed for ATLAS. Allow it in Android settings to take a photo.',
             ),
             const SizedBox(height: HrisSpace.s2),
             OutlinedButton(onPressed: openAppSettings, child: const Text('Open settings')),

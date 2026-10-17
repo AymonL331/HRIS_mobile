@@ -17,7 +17,7 @@ class OemHint {
   const OemHint(this.brand, this.steps, {this.onAppInfoPage = false});
 
   /// Where the reader should look, in plain words.
-  String get where => onAppInfoPage ? "on the HRIS page of your phone's app settings" : "in your phone's Settings";
+  String get where => onAppInfoPage ? "on the ATLAS page of your phone's app settings" : "in your phone's Settings";
 }
 
 /// The hint for a `Build.MANUFACTURER`, or null for phones that follow stock
@@ -42,26 +42,26 @@ OemHint? oemBatteryHint(String manufacturer) {
   }
   if (any(const ['vivo', 'iqoo'])) {
     return const OemHint('vivo', [
-      'Battery › Background power consumption: allow HRIS.',
-      'Also turn ON Auto-start for HRIS if you see it (i Manager › App manager).',
+      'Battery › Background power consumption: allow ATLAS.',
+      'Also turn ON Auto-start for ATLAS if you see it (i Manager › App manager).',
     ]);
   }
   if (any(const ['samsung'])) {
     return const OemHint('Samsung', [
       'Battery: choose "Unrestricted".',
-      'Then in Settings › Battery › Background usage limits, HRIS must NOT be in "Sleeping apps".',
+      'Then in Settings › Battery › Background usage limits, ATLAS must NOT be in "Sleeping apps".',
     ], onAppInfoPage: true);
   }
   if (any(const ['huawei', 'honor'])) {
     return const OemHint('HUAWEI / HONOR', [
-      'Battery › App launch › HRIS: turn OFF "Manage automatically".',
+      'Battery › App launch › ATLAS: turn OFF "Manage automatically".',
       'Then turn ON Auto-launch, Secondary launch and Run in background.',
     ]);
   }
   if (any(const ['infinix', 'tecno', 'itel'])) {
     return const OemHint('Infinix / TECNO / itel', [
-      'Phone Master (or Settings › App management) › Auto-start: allow HRIS.',
-      'Lock HRIS in the recent-apps screen so it is not cleared.',
+      'Phone Master (or Settings › App management) › Auto-start: allow ATLAS.',
+      'Lock ATLAS in the recent-apps screen so it is not cleared.',
     ]);
   }
   return null;
@@ -83,7 +83,7 @@ OemHint oemExactAlarmHint(String manufacturer) {
   bool any(List<String> names) => names.any(m.contains);
   const search =
       'Open Settings, tap the search bar at the top, type "alarms" and open "Alarms & reminders" (on some phones "Alarms and reminders" or "Set alarms and reminders").';
-  const allow = 'Find HRIS in the list and turn the switch ON.';
+  const allow = 'Find ATLAS in the list and turn the switch ON.';
 
   if (any(const ['samsung'])) {
     return const OemHint('Samsung', [

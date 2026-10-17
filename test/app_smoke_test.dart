@@ -29,7 +29,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Company or branch code'), findsOneWidget);
-    expect(find.text('Main HRIS'), findsOneWidget);
+    expect(find.text('Main ATLAS'), findsOneWidget);
     expect(find.text('Sandbox'), findsOneWidget);
   });
 }
