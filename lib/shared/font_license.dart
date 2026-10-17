@@ -10,5 +10,7 @@ void registerFontLicenses() {
     yield LicenseEntryWithLineBreaks(const ['IBM Plex Mono'], plex);
     final instrument = await rootBundle.loadString('assets/fonts/OFL-InstrumentSans.txt');
     yield LicenseEntryWithLineBreaks(const ['Instrument Sans'], instrument);
+    final serif = await rootBundle.loadString('assets/fonts/OFL-InstrumentSerif.txt');
+    yield LicenseEntryWithLineBreaks(const ['Instrument Serif'], serif);
   });
 }

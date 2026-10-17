@@ -310,7 +310,9 @@ class _Header extends StatelessWidget {
               ),
             ),
           Text(
-            [if (code.isNotEmpty) code, ?tenantName].join(' · '),
+            // The code alone: the branch already reads on the line above (2026-10-17). The
+            // signed-in place stands in only when the server sends no branch.
+            [if (code.isNotEmpty) code, if (branch == null) ?tenantName].join(' · '),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: HrisType.sm,

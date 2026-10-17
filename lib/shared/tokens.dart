@@ -271,6 +271,7 @@ abstract final class HrisRadius {
 /// Sans for all text, IBM Plex Mono for codes, IDs and figures.
 abstract final class HrisFont {
   static const sans = 'InstrumentSans';
+  static const serif = 'InstrumentSerif'; // the sign-in tagline only
   static const mono = 'IBMPlexMono';
 }
 

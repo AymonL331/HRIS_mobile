@@ -28,7 +28,7 @@ void main() {
     await session.bootstrap();
     await tester.pumpAndSettle();
     expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('Company or branch code'), findsOneWidget);
+    expect(find.text('Company or Branch Code'), findsOneWidget);
     expect(find.text('Main ATLAS'), findsOneWidget);
     expect(find.text('Sandbox'), findsOneWidget);
   });

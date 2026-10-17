@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../tokens.dart';
 
-enum BrandMarkSize { bar, auth }
+/// [band] is the sign-in page's petrol header (web .atl-lockup at phone width:
+/// a 36 px mark, a 16 px wordmark in the band's ink).
+enum BrandMarkSize { bar, auth, band }
 
 /// The ATLAS brand block, as the website draws it (AtlasLogo.jsx): the Meridian
 /// mark, then the monoline "ATLAS" wordmark to its right. [BrandMarkSize.bar] is
@@ -17,17 +19,21 @@ class BrandMark extends StatelessWidget {
 
   const BrandMark({super.key, this.size = BrandMarkSize.bar});
 
-  /// The wordmark ink per surface (guidelines: ink on light, mist on dark).
+  /// The wordmark ink per surface (guidelines: ink on light, mist on dark,
+  /// white on petrol).
   static const inkLight = Color(0xFF1B1F22);
   static const inkDark = Color(0xFFE7ECEC);
+  static const inkOnPetrol = Color(0xFFFFFFFF);
 
   @override
   Widget build(BuildContext context) {
     final auth = size == BrandMarkSize.auth;
-    final mark = auth ? HrisSize.brandMarkAuth : HrisSize.brandMark;
+    final band = size == BrandMarkSize.band;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    // The wordmark's cap height is half the mark, as the web lockup.
-    final wordHeight = mark * 0.5;
+    final mark = band ? 36.0 : (auth ? HrisSize.brandMarkAuth : HrisSize.brandMark);
+    // The wordmark's cap height is half the mark, as the web lockup (16 px on the band).
+    final wordHeight = band ? 16.0 : mark * 0.5;
+    final ink = band ? (dark ? inkDark : inkOnPetrol) : (dark ? inkDark : inkLight);
     return Semantics(
       label: 'ATLAS',
       excludeSemantics: true,
@@ -36,10 +42,10 @@ class BrandMark extends StatelessWidget {
         mainAxisAlignment: auth ? MainAxisAlignment.center : MainAxisAlignment.start,
         children: [
           AtlasMark(size: mark),
-          SizedBox(width: auth ? HrisSpace.s3 : HrisSpace.s2),
+          SizedBox(width: band ? 10 : (auth ? HrisSpace.s3 : HrisSpace.s2)),
           CustomPaint(
             size: Size(wordHeight * 90 / 24, wordHeight),
-            painter: _WordmarkPainter(dark ? inkDark : inkLight),
+            painter: _WordmarkPainter(ink),
           ),
         ],
       ),

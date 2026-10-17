@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.11.0+35
+version: 1.11.1+36
 
 environment:
   sdk: ^3.13.3
@@ -101,6 +101,7 @@ flutter:
     # (registered in main.dart).
     - assets/fonts/OFL.txt
     - assets/fonts/OFL-InstrumentSans.txt
+    - assets/fonts/OFL-InstrumentSerif.txt
 
   # The web's typefaces, bundled (not downloaded at runtime), as ATLAS
   # (2026-10-17): Instrument Sans for all text (github.com/Instrument/instrument-sans,
@@ -117,6 +118,12 @@ flutter:
           weight: 600
         - asset: assets/fonts/InstrumentSans-Bold.ttf
           weight: 700
+    # The sign-in tagline only, as the web (Instrument Serif, google/fonts ofl/instrumentserif).
+    - family: InstrumentSerif
+      fonts:
+        - asset: assets/fonts/InstrumentSerif-Regular.ttf
+        - asset: assets/fonts/InstrumentSerif-Italic.ttf
+          style: italic
     - family: IBMPlexMono
       fonts:
         - asset: assets/fonts/IBMPlexMono-Regular.ttf

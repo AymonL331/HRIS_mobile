@@ -11,6 +11,7 @@ import 'package:hris_mobile/core/location/location_fix.dart';
 import 'package:hris_mobile/core/device/device_readiness_service.dart';
 import 'package:hris_mobile/core/location/location_gate_service.dart';
 import 'package:hris_mobile/features/auth/env_settings_sheet.dart';
+import 'package:hris_mobile/features/auth/login_screen.dart';
 import 'package:hris_mobile/features/time_clock/clock_api.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -58,9 +59,11 @@ Future<({SessionController session, EnvStore env, List<http.Request> seen})> boo
 }
 
 Future<void> fillAndSubmit(WidgetTester tester, {String code = 'HEAD-OFFICE', String user = 'sofia', String pw = 'Sandbox@123'}) async {
-  await tester.enterText(find.widgetWithText(TextField, 'Company or branch code'), code);
-  await tester.enterText(find.widgetWithText(TextField, 'Username or email'), user);
-  await tester.enterText(find.widgetWithText(TextField, 'Password'), pw);
+  await tester.enterText(find.byKey(LoginScreen.codeKey), code);
+  await tester.enterText(find.byKey(LoginScreen.usernameKey), user);
+  await tester.enterText(find.byKey(LoginScreen.passwordKey), pw);
+  await tester.ensureVisible(find.widgetWithText(FilledButton, 'Sign in')); // the form scrolls under the header band
+  await tester.pumpAndSettle();
   await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
   await tester.pumpAndSettle();
 }
@@ -105,6 +108,8 @@ void main() {
   testWidgets('switching to Sandbox changes the address the next login goes to', (tester) async {
     final b = await boot(tester, (_) async => http.Response(env(data: {'token': 'T', 'user': userJson()}), 200));
     expect(find.text('https://atlas.monarch.ph'), findsOneWidget);
+    await tester.ensureVisible(find.text('Sandbox'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Sandbox'));
     await tester.pumpAndSettle();
     expect(find.text(EnvConfig.defaultSandboxUrl), findsOneWidget);
@@ -117,6 +122,8 @@ void main() {
 
   testWidgets('the Advanced sheet validates and saves the addresses', (tester) async {
     final b = await boot(tester, (_) async => http.Response(env(), 200));
+    await tester.ensureVisible(find.text('Advanced…'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Advanced…'));
     await tester.pumpAndSettle();
     expect(find.byType(EnvSettingsSheet), findsOneWidget);
