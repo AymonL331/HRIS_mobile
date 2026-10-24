@@ -6,10 +6,8 @@ import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/kit.dart';
 import '../../shared/widgets/message_banner.dart';
-import '../../shared/widgets/status_badge.dart';
 import 'payslip_api.dart';
 import 'payslip_detail_screen.dart';
-import 'payslip_enums.dart';
 import 'payslip_models.dart';
 import 'payslips_controller.dart';
 
@@ -146,6 +144,9 @@ class _PayslipsScreenState extends State<PayslipsScreen> {
   }
 }
 
+/// One payslip row — the web list's four columns (user 2026-10-23): PAY PERIOD,
+/// PAYROLL RUN, PAY DATE and NET PAY, stacked for a phone. The whole row opens
+/// the preview, as the web row does.
 class _PayslipTile extends StatelessWidget {
   final PayslipSummary payslip;
 
@@ -154,10 +155,20 @@ class _PayslipTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
-    // `payroll_runs.name` is nullable, so the run label falls back to the
-    // derived "<Type> run · <period>" — the same name the admin surfaces and the
-    // website use, so one payslip is identified identically everywhere.
-    final runLabel = payslip.run?.displayName ?? 'Payslip #${payslip.id}';
+    final run = payslip.run;
+    final labelStyle = TextStyle(
+      fontFamily: HrisFont.mono,
+      fontSize: 10.5,
+      letterSpacing: 0.6,
+      height: 14 / 10.5,
+      color: t.muted,
+    );
+    final valueStyle = TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text);
+
+    Widget field(String label, Widget value) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [Text(label, style: labelStyle), const SizedBox(height: 2), value],
+        );
 
     return InkWell(
       onTap: () => Navigator.of(context).push(
@@ -171,62 +182,55 @@ class _PayslipTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s3, HrisSpace.s3, HrisSpace.s3),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    runLabel,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.medium, height: 20 / 14, color: t.text),
+                  field(
+                    'PAY PERIOD',
+                    Text(
+                      run != null ? run.periodLabel : '—',
+                      style: valueStyle.copyWith(fontWeight: HrisType.medium),
+                    ),
                   ),
-                  const SizedBox(height: HrisSpace.s1),
+                  const SizedBox(height: HrisSpace.s2),
+                  field(
+                    'PAYROLL RUN',
+                    Text(
+                      run?.displayName ?? '—',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: valueStyle,
+                    ),
+                  ),
+                  const SizedBox(height: HrisSpace.s2),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      StatusBadge(payslipStatusLabel(payslip.status), tone: payslipStatusTone(payslip.status)),
-                      const SizedBox(width: HrisSpace.s2),
-                      Flexible(
-                        // The payslip number in the mono face, as the web's first
-                        // column; the date after it stays in the text face.
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: '#${payslip.id}', style: const TextStyle(fontFamily: HrisFont.mono)),
-                              if (payslip.transactionDate != null) TextSpan(text: ' · ${formatDateOnly(payslip.transactionDate)}'),
-                            ],
+                      Expanded(child: field('PAY DATE', Text(payslip.payDateLabel, style: valueStyle))),
+                      const SizedBox(width: HrisSpace.s3),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(payslip.isAdjusted ? 'NET PAY · ADJUSTED' : 'NET PAY', style: labelStyle),
+                          const SizedBox(height: 2),
+                          Text(
+                            Money.format(payslip.paidNet),
+                            style: TextStyle(
+                              fontSize: HrisType.md,
+                              fontWeight: HrisType.semibold,
+                              height: 24 / 16,
+                              color: t.text,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2),
-                        ),
+                        ],
                       ),
                     ],
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: HrisSpace.s3),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  Money.format(payslip.paidNet),
-                  style: TextStyle(
-                    fontSize: HrisType.md,
-                    fontWeight: HrisType.semibold,
-                    height: 24 / 16,
-                    color: t.text,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-                Text(
-                  payslip.isAdjusted ? 'Adjusted net' : 'Net pay',
-                  style: TextStyle(fontSize: HrisType.xs, height: 16 / 12, color: t.text2),
-                ),
-              ],
             ),
             const SizedBox(width: HrisSpace.s1),
             Icon(Icons.chevron_right, size: 20, color: t.muted),

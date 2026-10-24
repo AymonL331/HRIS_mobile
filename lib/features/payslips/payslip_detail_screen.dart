@@ -12,6 +12,7 @@ import 'payslip_breakdown_view.dart';
 import 'payslip_detail_controller.dart';
 import 'payslip_enums.dart';
 import 'payslip_models.dart';
+import 'payslip_print_screen.dart';
 
 /// One payslip, in full — the web's MyPayslipDetailPage on a phone: the run it
 /// belongs to, its status, the four figures, the statutory employee-share
@@ -42,7 +43,8 @@ class _PayslipDetailView extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.watch<PayslipDetailController>();
     return Scaffold(
-      appBar: AppBar(title: Text('Payslip #${c.payslipId}')),
+      // The pay period names the payslip, as on the web (user 2026-10-23).
+      appBar: AppBar(title: Text(c.payslip?.run?.periodLabel ?? 'Payslip')),
       body: switch (c.state) {
         PayslipLoadState.loading => const Center(child: CircularProgressIndicator()),
         // A payslip that isn't mine is a 404 on the server (it never confirms
@@ -56,7 +58,7 @@ class _PayslipDetailView extends StatelessWidget {
         PayslipLoadState.error => _DetailError(message: c.error ?? 'Please try again.', onRetry: c.load),
         PayslipLoadState.ready => c.payslip == null
             ? _DetailError(message: c.error ?? 'Please try again.', onRetry: c.load)
-            : _PayslipBody(payslip: c.payslip!),
+            : _PayslipBody(payslip: c.payslip!, api: c.api),
       },
     );
   }
@@ -64,8 +66,9 @@ class _PayslipDetailView extends StatelessWidget {
 
 class _PayslipBody extends StatelessWidget {
   final Payslip payslip;
+  final PayslipApi api;
 
-  const _PayslipBody({required this.payslip});
+  const _PayslipBody({required this.payslip, required this.api});
 
   @override
   Widget build(BuildContext context) {
@@ -85,17 +88,33 @@ class _PayslipBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(HrisSpace.s4, 0, HrisSpace.s4, HrisSpace.s6),
       children: [
-        // Aligned with the panels below it (the list already has the gutter).
+        // The web preview's head (user 2026-10-23): the pay period, then the
+        // payroll run and pay date, and the Print payslip button.
         PageHeader(
-          payslip.run?.displayName ?? 'Payslip #${payslip.id}',
-          subtitle: payslip.transactionDate == null ? null : formatDateOnly(payslip.transactionDate),
-          padding: const EdgeInsets.fromLTRB(0, HrisSpace.s4, 0, HrisSpace.s2),
+          payslip.run?.periodLabel ?? 'Payslip',
+          subtitle: [
+            if (payslip.run != null) payslip.run!.displayName,
+            'Pay date ${payslip.payDateLabel}',
+          ].join(' · '),
+          padding: const EdgeInsets.fromLTRB(0, HrisSpace.s4, 0, HrisSpace.s3),
         ),
         Padding(
           padding: const EdgeInsets.only(bottom: HrisSpace.s4),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: StatusBadge(payslipStatusLabel(payslip.status), tone: payslipStatusTone(payslip.status)),
+            child: FilledButton.icon(
+              icon: const Icon(Icons.print_outlined, size: 18),
+              label: const Text('Print payslip'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => PayslipPrintScreen(
+                    payslipId: payslip.id,
+                    api: api,
+                    title: payslip.run?.periodLabel ?? 'Payslip',
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
 

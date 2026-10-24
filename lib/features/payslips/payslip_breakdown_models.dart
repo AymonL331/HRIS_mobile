@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 import '../../core/format/money.dart';
 
 int _int(Object? v) => Money.toNum(v)?.round() ?? 0;
@@ -41,7 +43,12 @@ class PayslipBreakdown {
     required this.overtimeDays,
     required this.overtimeHourlyRate,
     required this.graceMinutes,
+    this.halfDayPaid = 0,
   });
+
+  /// What the payslip charged for half days (BIPO's half-day switch) — part of
+  /// the Late & undertime block's total, as on the web.
+  final num halfDayPaid;
 
   factory PayslipBreakdown.fromJson(Map<String, dynamic> j) => PayslipBreakdown(
         salaryType: j['salary_type'] as String?,
@@ -60,15 +67,16 @@ class PayslipBreakdown {
             .toList(growable: false),
         overtimeHourlyRate: Money.toNum(j['overtime_hourly_rate']),
         graceMinutes: _int(j['grace_minutes']),
+        halfDayPaid: Money.asNum(((j['half_day'] as Map<String, dynamic>?) ?? const {})['paid']),
       );
 
   /// Attendance changed after the run, so the rebuilt figures no longer add up
   /// to what was paid. The payslip figures stand; the working is what is stale.
   bool get mismatched => !basic.reconciles || !late.reconciles || !undertime.reconciles;
 
-  bool get hasDeductions => late.paid > 0 || undertime.paid > 0 || deductionDays.isNotEmpty;
+  bool get hasDeductions => late.paid > 0 || undertime.paid > 0 || halfDayPaid > 0 || deductionDays.isNotEmpty;
 
-  num get deductionsTotal => late.paid + undertime.paid;
+  num get deductionsTotal => late.paid + undertime.paid + halfDayPaid;
 
   num get overtimeTotal => overtimeDays.fold<num>(0, (sum, d) => sum + d.amount);
 
@@ -208,6 +216,16 @@ class DeductionDay {
   final num undertimeHours;
   final num undertimeAmount;
 
+  /// The day's punches (UTC ISO strings, server 2026-10-23) — the payslip lists
+  /// the clock-in for a late / half day and the clock-out for an undertime.
+  final String? clockInAt;
+  final String? clockOutAt;
+
+  /// BIPO's half-day switch: 0.5 / 1 of the day turned into an absence, and
+  /// what that cost (counted in the day's amount, as on the web).
+  final num halfDayAbsence;
+  final num halfDayAmount;
+
   const DeductionDay({
     required this.date,
     required this.lateMinutes,
@@ -220,6 +238,10 @@ class DeductionDay {
     required this.lateAmount,
     required this.undertimeHours,
     required this.undertimeAmount,
+    this.clockInAt,
+    this.clockOutAt,
+    this.halfDayAbsence = 0,
+    this.halfDayAmount = 0,
   });
 
   factory DeductionDay.fromJson(Map<String, dynamic> j) => DeductionDay(
@@ -234,9 +256,38 @@ class DeductionDay {
         lateAmount: Money.asNum(j['late_amount']),
         undertimeHours: Money.asNum(j['undertime_hours']),
         undertimeAmount: Money.asNum(j['undertime_amount']),
+        clockInAt: j['clock_in_at'] as String?,
+        clockOutAt: j['clock_out_at'] as String?,
+        halfDayAbsence: Money.asNum(j['half_day_absence']),
+        halfDayAmount: Money.asNum(j['half_day_amount']),
       );
 
-  num get amount => lateAmount + undertimeAmount;
+  num get amount => lateAmount + undertimeAmount + halfDayAmount;
+
+  /// A punch as the Philippine wall-clock time ("09:25 AM"), whatever the
+  /// phone's time zone — punches are stored UTC; the company works in UTC+8.
+  static String? phTime(String? iso) {
+    if (iso == null || iso.isEmpty) return null;
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return null;
+    final utc = parsed.isUtc ? parsed : DateTime.utc(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, parsed.second);
+    return DateFormat('hh:mm a').format(utc.add(const Duration(hours: 8)));
+  }
+
+  /// The web payslip's line (user 2026-10-23, `punchNote`): "Clock in 09:25 AM
+  /// (late)" / "Clock out 05:30 PM (undertime)" / "(half day)"; a day with no
+  /// punch to show (a leave-covered one) keeps its [note].
+  String get punchNote {
+    final halfDay = halfDayAbsence > 0;
+    final late = lateMinutes > 0 || lateAmount > 0;
+    final early = undertimeMinutes > 0 || undertimeAmount > 0;
+    final parts = <String>[];
+    final inAt = phTime(clockInAt);
+    final outAt = phTime(clockOutAt);
+    if (late && inAt != null) parts.add('Clock in $inAt (${halfDay && !early ? 'half day' : 'late'})');
+    if (early && outAt != null) parts.add('Clock out $outAt (${halfDay && !late ? 'half day' : 'undertime'})');
+    return parts.isNotEmpty ? parts.join(' · ') : note;
+  }
 
   static String _hours(num h) => '${h.toDouble().toStringAsFixed(2)} hour${h == 1 ? '' : 's'}';
 

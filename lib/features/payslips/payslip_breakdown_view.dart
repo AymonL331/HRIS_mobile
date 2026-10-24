@@ -120,25 +120,19 @@ class PayslipBreakdownView extends StatelessWidget {
         ],
 
         if (b.hasDeductions)
+          // Just the day and the punch behind each charge — no explanation —
+          // as the web payslip (user 2026-10-23).
           _Block(
-            title: 'Late & undertime',
+            title: b.halfDayPaid > 0 ? 'Late, undertime & half days' : 'Late & undertime',
             amount: b.deductionsTotal,
-            formula: 'Charged at ${Money.format(b.dailyRate)} ÷ 8 hours = ${Money.format(b.hourlyRate)} per hour. '
-                'Arriving within ${b.graceMinutes} minutes of your start time is not charged.',
             rows: [
               for (final d in b.deductionDays)
                 _DayRow(
                   date: d.date,
-                  note: d.note,
+                  note: d.punchNote,
                   amount: d.amount > 0 ? '− ${Money.format(d.amount)}' : Money.format(0),
                   dimmed: d.amount <= 0,
                 ),
-            ],
-            // The rounding rule is the single most disputed part of the figure,
-            // so it is stated rather than left to be discovered.
-            notes: const [
-              'Up to 30 minutes is charged by the minute. Past 30 minutes, any part of an hour is charged as a '
-                  'whole hour.',
             ],
           ),
       ],
@@ -151,14 +145,14 @@ class PayslipBreakdownView extends StatelessWidget {
 class _Block extends StatelessWidget {
   final String title;
   final num amount;
-  final String formula;
+  final String? formula;
   final List<_DayRow> rows;
   final List<String> notes;
 
   const _Block({
     required this.title,
     required this.amount,
-    required this.formula,
+    this.formula,
     required this.rows,
     this.notes = const [],
   });
@@ -190,8 +184,10 @@ class _Block extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 2),
-          Text(formula, style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2)),
+          if (formula != null) ...[
+            const SizedBox(height: 2),
+            Text(formula!, style: TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2)),
+          ],
           if (rows.isNotEmpty) ...[
             const SizedBox(height: HrisSpace.s2),
             for (final row in rows) row,

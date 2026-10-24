@@ -370,17 +370,23 @@ void main() {
   });
 
   group('the screens', () {
-    testWidgets('the list shows the run, the status and the net pay', (tester) async {
+    testWidgets('the list shows pay period, payroll run, pay date and net pay (as the web)', (tester) async {
       final api = FakePayslipApi(rows: [payslipRow(481)]);
       final c = PayslipsController(api: api);
       await tester.pumpWidget(wrapList(c, api));
       await tester.pumpAndSettle();
 
       expect(find.text('1 payslip'), findsOneWidget);
+      expect(find.text('PAY PERIOD'), findsOneWidget);
+      expect(find.text('Aug 1, 2026 – Aug 15, 2026'), findsOneWidget);
+      expect(find.text('PAYROLL RUN'), findsOneWidget);
       expect(find.text('Normal run · Aug 1, 2026 – Aug 15, 2026'), findsOneWidget);
-      expect(find.text('Released'), findsOneWidget);
+      expect(find.text('PAY DATE'), findsOneWidget);
+      expect(find.text('NET PAY'), findsOneWidget);
       expect(find.text('₱12,480.50'), findsOneWidget);
-      expect(find.textContaining('#481'), findsOneWidget);
+      // The web shows neither a status nor the payslip number in its list.
+      expect(find.text('Released'), findsNothing);
+      expect(find.textContaining('#481'), findsNothing);
     });
 
     testWidgets('an account with no payslips gets the empty state, not an error', (tester) async {
@@ -397,7 +403,9 @@ void main() {
 
       await tester.tap(find.text('Normal run · Aug 1, 2026 – Aug 15, 2026'));
       await tester.pumpAndSettle();
-      expect(find.text('Payslip #481'), findsOneWidget);
+      // The preview is named by its pay period and offers Print payslip.
+      expect(find.text('Aug 1, 2026 – Aug 15, 2026'), findsWidgets);
+      expect(find.text('Print payslip'), findsOneWidget);
       expect(api.calls, contains('detail:481'));
     });
 
@@ -445,8 +453,33 @@ void main() {
       await tester.scrollUntilVisible(find.textContaining('per overtime hour'), 300);
       expect(find.textContaining('₱86.875 per hour'), findsOneWidget);
 
-      await tester.scrollUntilVisible(find.textContaining('is not charged'), 300);
-      expect(find.textContaining('within 15 minutes'), findsOneWidget);
+      // Late & undertime: just the days — no grace / rounding explanation
+      // (user 2026-10-23, as the web payslip).
+      await tester.scrollUntilVisible(find.text('Late & undertime'), 300);
+      expect(find.textContaining('is not charged'), findsNothing);
+      expect(find.textContaining('charged by the minute'), findsNothing);
+    });
+
+    test('a late / undertime day reads as its punch in Philippine time', () {
+      final late = DeductionDay.fromJson({
+        'date': '2026-10-06', 'late_minutes': 25, 'late_amount': 39.64, 'late_hours': 0.42,
+        'clock_in_at': '2026-10-06T01:25:00.000Z', 'clock_out_at': '2026-10-06T10:03:00.000Z',
+      });
+      expect(late.punchNote, 'Clock in 09:25 AM (late)');
+      final early = DeductionDay.fromJson({
+        'date': '2026-10-08', 'undertime_minutes': 30, 'undertime_amount': 47.19, 'undertime_hours': 0.5,
+        'clock_in_at': '2026-10-08T00:50:00.000Z', 'clock_out_at': '2026-10-08T09:30:00.000Z',
+      });
+      expect(early.punchNote, 'Clock out 05:30 PM (undertime)');
+      final half = DeductionDay.fromJson({
+        'date': '2026-10-09', 'late_minutes': 300, 'half_day_absence': 0.5, 'half_day_amount': 377.5,
+        'clock_in_at': '2026-10-09T05:10:00.000Z',
+      });
+      expect(half.punchNote, 'Clock in 01:10 PM (half day)');
+      expect(half.amount, 377.5);
+      // No punch → the old sentence.
+      final noPunch = DeductionDay.fromJson({'date': '2026-10-10', 'late_minutes': 20, 'late_amount': 10, 'late_hours': 0.33});
+      expect(noPunch.punchNote, noPunch.note);
     });
 
     testWidgets('a stale working warns, and does not pretend to add up', (tester) async {

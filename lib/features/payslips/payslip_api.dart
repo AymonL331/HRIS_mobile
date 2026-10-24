@@ -25,6 +25,20 @@ abstract class PayslipApi {
 
   /// The working behind one payslip.
   Future<PayslipBreakdown> breakdown(int id);
+
+  /// Where the WEB print page for this payslip lives, and the session token it
+  /// signs in with — the app shows that page for "Print payslip" (user
+  /// 2026-10-23: the payslip exactly as the website shows it on a phone).
+  Future<PayslipPrintTarget> printTarget(int id);
+}
+
+/// The web print page of one payslip + the token the web app reads from
+/// `localStorage['hris_token']`. `?app=1` hides the web page's own toolbar.
+class PayslipPrintTarget {
+  final Uri url;
+  final String? token;
+
+  const PayslipPrintTarget({required this.url, required this.token});
 }
 
 class MobilePayslipApi implements PayslipApi {
@@ -67,4 +81,14 @@ class MobilePayslipApi implements PayslipApi {
         Endpoints.payslipBreakdown(id),
         parse: (d) => PayslipBreakdown.fromJson((d as Map<String, dynamic>?) ?? const {}),
       ));
+
+  @override
+  Future<PayslipPrintTarget> printTarget(int id) async {
+    final client = session.client;
+    final base = client.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    return PayslipPrintTarget(
+      url: Uri.parse('$base/employee/payslips/$id/print?app=1'),
+      token: await client.tokenProvider(),
+    );
+  }
 }

@@ -35,12 +35,17 @@ class PayrollRunRef {
   final String? periodStart;
   final String? periodEnd;
 
+  /// The run's pay date (`payroll_runs.payment_date`, nullable) — the web list's
+  /// "Pay date" column, falling back to the payslip's transaction date.
+  final String? paymentDate;
+
   const PayrollRunRef({
     required this.id,
     required this.name,
     required this.type,
     required this.periodStart,
     required this.periodEnd,
+    this.paymentDate,
   });
 
   static PayrollRunRef? fromJson(Object? raw) {
@@ -53,8 +58,12 @@ class PayrollRunRef {
       type: raw['type'] as String?,
       periodStart: raw['period_start'] as String?,
       periodEnd: raw['period_end'] as String?,
+      paymentDate: raw['payment_date'] as String?,
     );
   }
+
+  /// "Oct 1, 2026 – Oct 15, 2026" — the web's Pay period column.
+  String get periodLabel => '${formatDateOnly(periodStart)} – ${formatDateOnly(periodEnd)}';
 
   /// The web's `runDisplayName`: the run's own name when it has one, else the
   /// derived `<Type> run · <period>` label. Identical to the website's so a
@@ -93,6 +102,9 @@ class PayslipSummary {
 
   /// What is actually paid — the figure a list row shows.
   num get paidNet => adjustedNetPay ?? netPay;
+
+  /// The web list's "Pay date": the run's pay date, else the transaction date.
+  String get payDateLabel => formatDateOnly(run?.paymentDate ?? transactionDate);
 
   /// True when an active correction moved the net, so the row can say so.
   bool get isAdjusted => adjustedNetPay != null && adjustedNetPay != netPay;
@@ -213,6 +225,9 @@ class Payslip {
   /// What is actually paid; the original stays in [netPay].
   num get paidNet => adjustedNetPay ?? netPay;
   bool get isAdjusted => adjustedNetPay != null && adjustedNetPay != netPay;
+
+  /// "Pay date": the run's pay date, else the transaction date (as the web).
+  String get payDateLabel => formatDateOnly(run?.paymentDate ?? transactionDate);
 
   factory Payslip.fromJson(Map<String, dynamic> data) {
     final p = (data['payslip'] as Map<String, dynamic>?) ?? const {};

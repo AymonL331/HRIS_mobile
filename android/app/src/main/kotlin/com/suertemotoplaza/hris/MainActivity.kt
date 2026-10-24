@@ -1,14 +1,18 @@
 package com.suertemotoplaza.hris
 
 import android.app.AlarmManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.print.PrintAttributes
+import android.print.PrintManager
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugins.webviewflutter.WebViewFlutterAndroidExternalApi
 import java.io.File
 
 /**
@@ -19,6 +23,33 @@ import java.io.File
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // PRINT PAYSLIP (2026-10-23): hand the payslip web page shown in the app's
+        // WebView to ANDROID'S OWN print screen (print, or Save as PDF). The Dart
+        // side passes the webview_flutter WebView's identifier; A4 landscape is
+        // the payslip's page.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "hris/print").setMethodCallHandler { call, result ->
+            if (call.method != "printWebView") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            val id = call.argument<Number>("id")?.toLong()
+            val name = call.argument<String>("name") ?: "Payslip"
+            val webView = if (id == null) null else WebViewFlutterAndroidExternalApi.getWebView(flutterEngine, id)
+            if (webView == null) {
+                result.error("NO_WEBVIEW", "The payslip page is not ready.", null)
+                return@setMethodCallHandler
+            }
+            try {
+                val printManager = getSystemService(Context.PRINT_SERVICE) as PrintManager
+                val attributes = PrintAttributes.Builder()
+                    .setMediaSize(PrintAttributes.MediaSize.ISO_A4.asLandscape())
+                    .build()
+                printManager.print(name, webView.createPrintDocumentAdapter(name), attributes)
+                result.success(true)
+            } catch (e: Exception) {
+                result.error("PRINT_FAILED", e.message, null)
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "hris/app_update").setMethodCallHandler { call, result ->
             when (call.method) {
                 // Android 8+ asks the user, once per app, to allow "Install unknown apps".

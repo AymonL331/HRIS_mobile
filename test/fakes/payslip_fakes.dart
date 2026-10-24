@@ -192,6 +192,12 @@ class FakePayslipApi implements PayslipApi {
     if (breakdownError != null) throw breakdownError!;
     return PayslipBreakdown.fromJson(breakdownJson ?? breakdownPayload());
   }
+
+  @override
+  Future<PayslipPrintTarget> printTarget(int id) async {
+    calls.add('print:$id');
+    return PayslipPrintTarget(url: Uri.parse('https://atlas.test/employee/payslips/$id/print?app=1'), token: 'tok');
+  }
 }
 
 const notFound = ApiException(status: 404, message: 'Payslip not found.');
