@@ -76,6 +76,7 @@ class PayslipBreakdownView extends StatelessWidget {
                   note: d.note,
                   amount: d.credited ? Money.format(b.dailyRate) : '—',
                   dimmed: !d.credited,
+                  tone: _AmountTone.earned,
                 ),
             ],
           ),
@@ -97,6 +98,7 @@ class PayslipBreakdownView extends StatelessWidget {
                   note: d.note,
                   amount: d.paid ? Money.format(d.amount) : '—',
                   dimmed: !d.paid,
+                  tone: _AmountTone.earned,
                   // Marked on the DATE, because the date is what looks wrong: an
                   // employee scanning this list sees a day outside the cutoff
                   // they were paid for, and the tag answers the question that
@@ -132,6 +134,7 @@ class PayslipBreakdownView extends StatelessWidget {
                   note: d.punchNote,
                   amount: d.amount > 0 ? '− ${Money.format(d.amount)}' : Money.format(0),
                   dimmed: d.amount <= 0,
+                  tone: _AmountTone.deducted,
                 ),
             ],
           ),
@@ -202,6 +205,10 @@ class _Block extends StatelessWidget {
   }
 }
 
+/// The colour of a day's amount, as the web payslip: green = paid, red = taken off
+/// (user 2026-10-26: "make it look like the one in the web app").
+enum _AmountTone { plain, earned, deducted }
+
 /// One day of the working: the date, the sentence, and what it was worth.
 class _DayRow extends StatelessWidget {
   final String date;
@@ -209,13 +216,28 @@ class _DayRow extends StatelessWidget {
   final String amount;
   final bool dimmed;
   final String? tag;
+  final _AmountTone tone;
 
-  const _DayRow({required this.date, required this.note, required this.amount, this.dimmed = false, this.tag});
+  const _DayRow({
+    required this.date,
+    required this.note,
+    required this.amount,
+    this.dimmed = false,
+    this.tag,
+    this.tone = _AmountTone.plain,
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
     final labelColor = dimmed ? t.muted : t.text;
+    final amountColor = dimmed
+        ? t.muted
+        : switch (tone) {
+            _AmountTone.earned => t.success.text,
+            _AmountTone.deducted => t.danger.text,
+            _AmountTone.plain => t.text,
+          };
     // A ruled row, as the web's day list.
     return Container(
       padding: const EdgeInsets.symmetric(vertical: HrisSpace.s2),
@@ -248,9 +270,10 @@ class _DayRow extends StatelessWidget {
             amount,
             style: TextStyle(
               fontSize: HrisType.sm,
-              fontWeight: HrisType.semibold,
+              // Coloured amounts a step lighter, as the web; plain ones stay semibold.
+              fontWeight: tone == _AmountTone.plain ? HrisType.semibold : HrisType.medium,
               height: 20 / 14,
-              color: labelColor,
+              color: amountColor,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),

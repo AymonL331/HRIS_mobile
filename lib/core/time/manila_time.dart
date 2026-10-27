@@ -34,4 +34,11 @@ abstract final class ManilaTime {
   }
 
   static String monthLabel(int year, int month) => DateFormat('MMMM yyyy').format(DateTime(year, month));
+  static String shortMonthLabel(int year, int month) => DateFormat('MMM yyyy').format(DateTime(year, month));
+
+  /// "Oct 23, 2026" — the web's formatDateOnly, for a server calendar date.
+  static String dateOnly(String yyyyMmDd) {
+    final d = DateTime.tryParse(yyyyMmDd);
+    return d == null ? yyyyMmDd : DateFormat('MMM d, yyyy').format(d);
+  }
 }

@@ -9,7 +9,6 @@ import 'package:hris_mobile/core/config/env_store.dart';
 import 'package:hris_mobile/core/location/location_fix.dart';
 import 'package:hris_mobile/core/device/device_readiness_service.dart';
 import 'package:hris_mobile/core/location/location_gate_service.dart';
-import 'package:hris_mobile/features/attendance/team_api.dart';
 import 'package:hris_mobile/features/time_clock/clock_api.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -17,15 +16,13 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../fakes/clock_fakes.dart';
-import '../fakes/team_fakes.dart';
 
 void main() {
-  testWidgets('a Super Admin (no employee) sees "No employee record" on the clock, EVERYONE on Attendance, and Settings still works', (tester) async {
+  testWidgets('a Super Admin (no employee) sees "No employee record" on the clock and on My Attendance (no team view on a phone), and Settings still works', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final envStore = EnvStore();
     await envStore.load();
     final api = FakeClockApi();
-    final team = FakeTeamApi({});
     final mock = MockClient((req) async => http.Response(
           jsonEncode({
             'success': true, 'message': 'OK', 'error': null,
@@ -46,7 +43,6 @@ void main() {
         Provider<DeviceReadinessService>.value(value: AlwaysReadyDevice()),
         Provider<LocationFixService>.value(value: FakeFixService()),
         Provider<ClockApi?>.value(value: api),
-        Provider<TeamAttendanceApi?>.value(value: team),
       ],
       child: const HrisApp(),
     ));
@@ -63,13 +59,11 @@ void main() {
 
     expect(find.text('No employee record'), findsOneWidget);
     expect(api.statusCalls, 0); // nothing was asked of the clock API
-    await go('Attendance');
-    // A Super Admin holds every grant: the tab is the team DTR, not a dead end.
-    expect(find.text('No employee record'), findsNothing);
-    expect(find.text('Search name or employee code'), findsOneWidget);
-    expect(find.text('No employees to show for this day.'), findsOneWidget);
-    expect(team.calls.length, 1);
-    expect(find.text('Mine'), findsNothing); // no own DTR to switch to
+    await go('My Attendance');
+    // Even a Super Admin, who holds every grant, gets no everyone-list here.
+    expect(find.text('No employee record'), findsOneWidget);
+    expect(find.text('Search name or employee code'), findsNothing);
+    expect(find.text('Everyone'), findsNothing);
 
     // My Payslips is the same story: no employee, so no `/api/me/payslips` call
     // to 404 — the page says so instead.

@@ -53,10 +53,6 @@ class User {
 
   bool can(String permission) => isSuperAdmin || permissions.contains(permission);
 
-  /// May this login open the team DTR ("Everyone" on the Attendance tab)? The
-  /// same grant the web console's DTR needs; the server re-checks it.
-  bool get canViewTeamAttendance => can('attendance:view');
-
   /// May this login send a new profile photo from the app (server migration 062)?
   /// The Employee role holds it by default; HR can take it away per account.
   bool get canSendProfilePhoto => can('profile_photo:create');

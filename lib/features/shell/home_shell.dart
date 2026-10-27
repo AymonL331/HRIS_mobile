@@ -10,10 +10,6 @@ import '../../shared/widgets/user_avatar.dart';
 import '../attendance/attendance_api.dart';
 import '../attendance/attendance_controller.dart';
 import '../attendance/attendance_screen.dart';
-import '../attendance/attendance_tab.dart';
-import '../attendance/team_api.dart';
-import '../attendance/team_controller.dart';
-import '../attendance/team_screen.dart';
 import '../payslips/payslip_api.dart';
 import '../payslips/payslips_controller.dart';
 import '../payslips/payslips_screen.dart';
@@ -101,22 +97,16 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     // A login with no employee (a Super Admin, a special account) has nothing to
     // clock, no DTR of its own and no payslips; those pages say so instead of
-    // firing `/api/me/*` calls that 404. The Attendance page depends on TWO
-    // things: an employee record (my own DTR) and the attendance:view grant
-    // (everyone's DTR, read-only) — any combination.
+    // firing `/api/me/*` calls that 404. Attendance is ONLY my own record: the
+    // team view (everyone's DTR for attendance:view holders) was removed on
+    // 2026-10-27 — no phone shows other people's attendance (the server refuses
+    // it too, 403 MOBILE_TEAM_ATTENDANCE_OFF).
     final user = context.watch<SessionController>().user;
     final hasEmployee = user?.employeeId != null;
-    final canTeam = user?.canViewTeamAttendance ?? false;
-    final attendanceTitle = canTeam ? 'Attendance' : 'My Attendance';
+    const attendanceTitle = 'My Attendance';
     final titles = ['Time Clock', attendanceTitle, 'My Payslips', 'Profile Photo', 'Settings'];
     final session = context.read<SessionController>();
-    final Widget attendance = hasEmployee && canTeam
-        ? const AttendanceTab()
-        : canTeam
-        ? const TeamAttendanceScreen()
-        : hasEmployee
-        ? const AttendanceScreen()
-        : const NoEmployeeScreen(what: 'attendance record');
+    final Widget attendance = hasEmployee ? const AttendanceScreen() : const NoEmployeeScreen(what: 'attendance record');
     final pages = <Widget>[
       hasEmployee
           // No profile photo yet → the card points at Profile Photo (index 3).
@@ -195,12 +185,6 @@ class _HomeShellState extends State<HomeShell> {
         ChangeNotifierProvider<AttendanceController>(
           create: (ctx) => AttendanceController(
             api: ctx.read<AttendanceApi?>() ?? MobileAttendanceApi(ctx.read<SessionController>()),
-          ),
-        ),
-        // Lazy (provider default): created only when the team view first reads it.
-        ChangeNotifierProvider<TeamAttendanceController>(
-          create: (ctx) => TeamAttendanceController(
-            api: ctx.read<TeamAttendanceApi?>() ?? MobileTeamAttendanceApi(ctx.read<SessionController>()),
           ),
         ),
         ChangeNotifierProvider<PayslipsController>(

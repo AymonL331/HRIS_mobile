@@ -91,3 +91,130 @@ class DtrMonth {
   int count(String dayType) => days.where((d) => d.dayType == dayType).length;
   int get lateCount => days.where((d) => d.isLate).length;
 }
+
+/// The figures of `GET /api/me/attendance/summary` — the headline totals for the
+/// period, and (with [period] set) one month of the breakdown. The SAME fields
+/// the web's summary tiles and month table read; sums arrive as strings from
+/// MySQL, so every count goes through [_int].
+class AttendanceTotals {
+  final String? period; // 'YYYY-MM' on a breakdown row, null on the totals
+  final int records;
+  final int presentDays;
+  final int obDays;
+  final int lateDays;
+  final int lateMinutes;
+  final int absentDays;
+  final int workedMinutes;
+  final int? avgWorkedMinutes; // null = no complete day to average
+  final int undertimeIncidents;
+  final int undertimeMinutes;
+  final int halfDays;
+  final int missingClockOut;
+  final int openDays;
+  final int faceDays;
+  final int flaggedDays;
+  final String? firstDate;
+  final String? lastDate;
+
+  const AttendanceTotals({
+    this.period,
+    required this.records,
+    required this.presentDays,
+    required this.obDays,
+    required this.lateDays,
+    required this.lateMinutes,
+    required this.absentDays,
+    required this.workedMinutes,
+    required this.avgWorkedMinutes,
+    required this.undertimeIncidents,
+    required this.undertimeMinutes,
+    required this.halfDays,
+    required this.missingClockOut,
+    required this.openDays,
+    required this.faceDays,
+    required this.flaggedDays,
+    this.firstDate,
+    this.lastDate,
+  });
+
+  static String? _date(Object? v) {
+    final s = v?.toString();
+    return s == null || s.length < 10 ? null : s.substring(0, 10);
+  }
+
+  factory AttendanceTotals.fromJson(Map<String, dynamic> j) => AttendanceTotals(
+        period: j['period']?.toString(),
+        records: _int(j['records']),
+        presentDays: _int(j['present_days']),
+        obDays: _int(j['ob_days']),
+        lateDays: _int(j['late_days']),
+        lateMinutes: _int(j['late_minutes']),
+        absentDays: _int(j['absent_days']),
+        workedMinutes: _int(j['worked_minutes']),
+        avgWorkedMinutes: j['avg_worked_minutes'] == null ? null : _int(j['avg_worked_minutes']),
+        undertimeIncidents: _int(j['undertime_incidents']),
+        undertimeMinutes: _int(j['undertime_minutes']),
+        halfDays: _int(j['half_days']),
+        missingClockOut: _int(j['missing_clock_out']),
+        openDays: _int(j['open_days']),
+        faceDays: _int(j['face_days']),
+        flaggedDays: _int(j['flagged_days']),
+        firstDate: _date(j['first_date']),
+        lastDate: _date(j['last_date']),
+      );
+
+  /// "Oct 2026" for a breakdown row.
+  String get monthLabel {
+    final m = RegExp(r'^(\d{4})-(\d{2})$').firstMatch(period ?? '');
+    if (m == null) return period ?? '—';
+    return ManilaTime.shortMonthLabel(int.parse(m[1]!), int.parse(m[2]!));
+  }
+}
+
+/// The whole summary answer: the totals and the months behind them, newest first.
+class AttendanceSummary {
+  final AttendanceTotals totals;
+  final List<AttendanceTotals> months;
+
+  const AttendanceSummary({required this.totals, required this.months});
+
+  factory AttendanceSummary.fromJson(Map<String, dynamic> j) => AttendanceSummary(
+        totals: AttendanceTotals.fromJson((j['totals'] as Map<String, dynamic>?) ?? const {}),
+        months: ((j['items'] as List?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(AttendanceTotals.fromJson)
+            .toList(),
+      );
+}
+
+/// One of MY DTR correction requests (`GET /api/me/correction-requests`) — the
+/// web's "My correction requests" table row.
+class CorrectionRequest {
+  final int id;
+  final String date;
+  final DateTime? requestedClockIn;
+  final DateTime? requestedClockOut;
+  final String status; // pending | approved | rejected | cancelled
+  final String? reason;
+  final String? proofPhotoUrl;
+
+  const CorrectionRequest({
+    required this.id,
+    required this.date,
+    required this.requestedClockIn,
+    required this.requestedClockOut,
+    required this.status,
+    required this.reason,
+    required this.proofPhotoUrl,
+  });
+
+  factory CorrectionRequest.fromJson(Map<String, dynamic> j) => CorrectionRequest(
+        id: _int(j['id']),
+        date: '${j['date'] ?? ''}'.substring(0, '${j['date'] ?? ''}'.length.clamp(0, 10)),
+        requestedClockIn: ManilaTime.parseUtc(j['requested_clock_in']?.toString()),
+        requestedClockOut: ManilaTime.parseUtc(j['requested_clock_out']?.toString()),
+        status: (j['status'] ?? 'pending').toString(),
+        reason: j['reason'] as String?,
+        proofPhotoUrl: j['proof_photo_url'] as String?,
+      );
+}

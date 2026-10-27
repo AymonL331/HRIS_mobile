@@ -40,6 +40,15 @@ abstract final class Endpoints {
   static const faceEnrollmentChallenge = '/api/me/face-enrollment/challenge';
   static const attendanceCalendar = '/api/me/attendance/calendar';
 
+  /// MY ATTENDANCE — SUMMARY + CORRECTIONS (2026-10-27), the web My Attendance's
+  /// twins: totals for a period with a month-by-month breakdown, my correction
+  /// requests, and filing one (the proof photo is staged first; the request then
+  /// carries only its URL). All self-scoped on the server.
+  static const attendanceSummary = '/api/me/attendance/summary';
+  static const correctionRequests = '/api/me/correction-requests';
+  static const correctionProof = '/api/me/attendance-requests/attachment';
+  static const correctionSubmit = '/api/me/attendance-requests';
+
   /// My payslips. Ownership-scoped on the server (`resolveSelf` forces the
   /// employee from the signed-in account), so there is no employee id to pass
   /// and none to tamper with. Already inside the mobile token's `/api/me/`
@@ -64,9 +73,4 @@ abstract final class Endpoints {
   static String notificationRead(int id) => '/api/me/notifications/$id/read';
   static String notificationAcknowledge(int id) => '/api/me/notifications/$id/acknowledge';
   static const reminderSchedule = '/api/me/reminder-schedule';
-
-  /// The ONE console route a mobile token may read: the team DTR, for a login
-  /// that holds attendance:view. GET only; the server refuses everything else
-  /// under /api/attendance with MOBILE_SCOPE.
-  static const teamCalendar = '/api/attendance/calendar';
 }

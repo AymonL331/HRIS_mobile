@@ -5,15 +5,21 @@ import '../../core/time/duration_label.dart';
 import '../../core/time/manila_time.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
+import '../../shared/widgets/kit.dart';
 import '../../shared/widgets/message_banner.dart';
 import '../../shared/widgets/status_badge.dart';
 import 'attendance_controller.dart';
 import 'attendance_models.dart';
+import 'attendance_summary_view.dart';
+import 'correction_form_screen.dart';
 
-/// My Attendance: the calendar-complete DTR, month by month, read-only. No
-/// coordinates anywhere — the model does not even carry them. Drawn like the
-/// web DTR: a month label, then the days as rows of a bordered card with the
-/// web's status badges.
+/// My Attendance: the calendar-complete DTR, month by month. No coordinates
+/// anywhere — the model does not even carry them. Drawn like the web DTR: a
+/// month label, then the days as rows of a bordered card with the web's status
+/// badges.
+///
+/// Since 2026-10-27 it has the web page's top row too: the Records | Summary
+/// switch and "File a correction", plus "My correction requests" under the record.
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
 
@@ -22,6 +28,65 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
+  bool _summary = false;
+  bool _summaryOpened = false; // mounted from the first visit on, then kept
+
+  Future<void> _fileCorrection() async {
+    final c = context.read<AttendanceController>();
+    final filed = await CorrectionFormScreen.open(context, api: c.api, today: c.today);
+    if (filed != true || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Correction request submitted.')));
+    await c.loadCorrections();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s2, HrisSpace.s4, HrisSpace.s2),
+          child: Row(
+            children: [
+              Expanded(
+                child: SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Records')),
+                    ButtonSegment(value: true, label: Text('Summary')),
+                  ],
+                  selected: {_summary},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (s) => setState(() {
+                    _summary = s.first;
+                    _summaryOpened = _summaryOpened || _summary;
+                  }),
+                ),
+              ),
+              const SizedBox(width: HrisSpace.s2),
+              FilledButton(onPressed: _fileCorrection, child: const Text('File a correction')),
+            ],
+          ),
+        ),
+        // Both views stay alive once opened, so switching keeps each one's scroll position.
+        Expanded(
+          child: IndexedStack(
+            index: _summary ? 1 : 0,
+            children: [const _RecordsView(), if (_summaryOpened) const AttendanceSummaryView() else const SizedBox.shrink()],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The day-by-day record (the web's Records view).
+class _RecordsView extends StatefulWidget {
+  const _RecordsView();
+
+  @override
+  State<_RecordsView> createState() => _RecordsViewState();
+}
+
+class _RecordsViewState extends State<_RecordsView> {
   @override
   void initState() {
     super.initState();
@@ -103,6 +168,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               ),
             ),
           ],
+          if (c.corrections.isNotEmpty)
+            SliverToBoxAdapter(child: _CorrectionsSection(items: c.corrections)),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s1, HrisSpace.s4, HrisSpace.s5),
@@ -272,6 +339,70 @@ class _DayTile extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// MY CORRECTION REQUESTS — the web's read-only table of what I have filed,
+/// one ruled row per request: the day, the status, the requested times and the reason.
+class _CorrectionsSection extends StatelessWidget {
+  final List<CorrectionRequest> items;
+  const _CorrectionsSection({required this.items});
+
+  static const _labels = {'pending': 'Pending', 'approved': 'Approved', 'rejected': 'Rejected', 'cancelled': 'Cancelled'};
+  static const _tones = {
+    'pending': StatusTone.warning,
+    'approved': StatusTone.success,
+    'rejected': StatusTone.danger,
+    'cancelled': StatusTone.neutral,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final t = HrisTokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(HrisSpace.s4, HrisSpace.s2, HrisSpace.s4, HrisSpace.s3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'My correction requests',
+            style: TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text),
+          ),
+          const SizedBox(height: HrisSpace.s2),
+          RuledList(
+            children: [
+              for (final r in items)
+                RuledRow(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              ManilaTime.dateOnly(r.date),
+                              style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.medium, height: 20 / 14, color: t.text),
+                            ),
+                          ),
+                          StatusBadge(_labels[r.status] ?? r.status, tone: _tones[r.status] ?? StatusTone.neutral),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'In ${r.requestedClockIn == null ? '—' : ManilaTime.time(r.requestedClockIn!)}  ·  '
+                        'Out ${r.requestedClockOut == null ? '—' : ManilaTime.time(r.requestedClockOut!)}',
+                        style: TextStyle(fontFamily: HrisFont.mono, fontSize: HrisType.xs, height: 18 / 12, color: t.text),
+                      ),
+                      if ((r.reason ?? '').isNotEmpty)
+                        Text(r.reason!, style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, color: t.text2)),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ],
       ),
