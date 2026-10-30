@@ -57,6 +57,18 @@ abstract final class Endpoints {
   static String payslip(int id) => '/api/me/payslips/$id';
   static String payslipBreakdown(int id) => '/api/me/payslips/$id/breakdown';
 
+  /// MY TRAVEL ORDERS (2026-10-29), the web My Travel Orders' calls: may I file
+  /// (an approved face), my orders, one order with its stops / proof / checklist,
+  /// the authority image staged first, filing, the sequential GPS check-in, proof
+  /// photos and remarks, and cancelling a pending one. All self-scoped.
+  static const travelOrderReadiness = '/api/me/travel-order-readiness';
+  static const travelOrders = '/api/me/travel-orders';
+  static const travelOrderAttachment = '/api/me/travel-orders/attachment';
+  static String travelOrder(int id) => '/api/me/travel-orders/$id';
+  static String travelOrderArrive(int id) => '/api/me/travel-orders/$id/arrive';
+  static String travelOrderProof(int id) => '/api/me/travel-orders/$id/proof';
+  static String travelOrderCancel(int id) => '/api/me/travel-orders/$id/cancel';
+
   /// PROFILE PHOTO (server migration 062): my current photo and where the last one I
   /// sent stands (GET), and a new camera photo for HR to approve (POST — needs the
   /// `profile_photo:create` grant). Mobile-token only.

@@ -27,6 +27,8 @@ import '../time_clock/clock_api.dart';
 import '../time_clock/time_clock_controller.dart';
 import '../time_clock/time_clock_screen.dart';
 import '../tracking/tracking_service.dart';
+import '../travel_orders/travel_order_api.dart';
+import '../travel_orders/travel_orders_screen.dart';
 import 'app_drawer.dart';
 import 'no_employee_screen.dart';
 
@@ -104,7 +106,7 @@ class _HomeShellState extends State<HomeShell> {
     final user = context.watch<SessionController>().user;
     final hasEmployee = user?.employeeId != null;
     const attendanceTitle = 'My Attendance';
-    final titles = ['Time Clock', attendanceTitle, 'My Payslips', 'Profile Photo', 'Settings'];
+    final titles = ['Time Clock', attendanceTitle, 'My Payslips', 'Profile Photo', 'Settings', 'My Travel Orders'];
     final session = context.read<SessionController>();
     final Widget attendance = hasEmployee ? const AttendanceScreen() : const NoEmployeeScreen(what: 'attendance record');
     final pages = <Widget>[
@@ -125,6 +127,18 @@ class _HomeShellState extends State<HomeShell> {
             )
           : const NoEmployeeScreen(what: 'profile photo'),
       const SettingsScreen(),
+      // MY TRAVEL ORDERS (2026-10-29): the web page on the phone — file, check in,
+      // proof, remarks. Index 5 so the older destinations keep their numbers.
+      hasEmployee
+          ? TravelOrdersScreen(
+              api: _optional<TravelOrderApi?>(context) ?? MobileTravelOrderApi(session),
+              fixes: context.read<LocationFixService>(),
+              baseUrl: session.env.baseUrl,
+              onOpenTimeClock: () => setState(() => _index = 0),
+              onOpenProfilePhoto: () => setState(() => _index = 3),
+              active: _index == 5,
+            )
+          : const NoEmployeeScreen(what: 'travel order'),
     ];
     final sections = [
       NavSection('Self-Service', [
@@ -145,6 +159,12 @@ class _HomeShellState extends State<HomeShell> {
           label: 'My Payslips',
           icon: Icons.receipt_long_outlined,
           selectedIcon: Icons.receipt_long,
+        ),
+        const NavDestination(
+          index: 5,
+          label: 'My Travel Orders',
+          icon: Icons.location_on_outlined,
+          selectedIcon: Icons.location_on,
         ),
       ]),
       const NavSection('Account', [
