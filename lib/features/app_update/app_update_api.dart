@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/http/api_client.dart';
+import '../../core/http/api_exception.dart';
 import '../../core/http/endpoints.dart';
 import 'app_update_models.dart';
 
@@ -24,9 +25,13 @@ class HttpAppUpdateApi implements AppUpdateApi {
   final http.Client _client;
   final Future<Directory> Function() _cacheDir;
 
+  /// The session's token, for the download pass. Null when signed out.
+  final Future<String?> Function()? tokenProvider;
+
   HttpAppUpdateApi({
     required this.baseUrl,
     required this.appVersion,
+    this.tokenProvider,
     http.Client? client,
     Future<Directory> Function()? cacheDir,
   })  : _client = client ?? http.Client(),
@@ -39,8 +44,28 @@ class HttpAppUpdateApi implements AppUpdateApi {
     return api.get(Endpoints.appUpdateLatest, parse: (data) => UpdateInfo.fromJson(data as Map<String, dynamic>));
   }
 
+  /// Where to download from. The server gives a signed-in account a short-lived
+  /// address (2026-11-07: the app is only for people given access). A server from
+  /// before that has no such route, and its plain path still works.
+  Future<String> _downloadPath(AppRelease release) async {
+    final token = await tokenProvider?.call();
+    if (token == null) return release.downloadPath;
+    final api = ApiClient(baseUrl: baseUrl, tokenProvider: () async => token, appVersion: appVersion, client: _client);
+    try {
+      return await api.post(
+        Endpoints.appDownload,
+        body: {'version_code': release.versionCode},
+        parse: (data) => (data as Map<String, dynamic>)['download_path'] as String,
+      );
+    } on ApiException catch (e) {
+      if (e.status == 404) return release.downloadPath;
+      rethrow;
+    }
+  }
+
   @override
   Future<File> download(AppRelease release, {void Function(double progress)? onProgress}) async {
+    final path = await _downloadPath(release);
     final sep = Platform.pathSeparator;
     final dir = Directory('${(await _cacheDir()).path}${sep}updates');
     // Only ever one downloaded update on the phone: clear what an earlier attempt left.
@@ -53,7 +78,7 @@ class HttpAppUpdateApi implements AppUpdateApi {
     }
     final file = File('${dir.path}${sep}hris-${release.versionName}+${release.versionCode}.apk');
 
-    final request = http.Request('GET', Uri.parse('$baseUrl${release.downloadPath}'))
+    final request = http.Request('GET', Uri.parse('$baseUrl$path'))
       ..headers['ngrok-skip-browser-warning'] = 'true'
       ..headers['User-Agent'] = 'HRISMobile/$appVersion (${Platform.operatingSystem})';
 
@@ -65,6 +90,9 @@ class HttpAppUpdateApi implements AppUpdateApi {
         throw const AppUpdateException('Cannot reach the server to download the update. Check your connection.');
       }
       rethrow;
+    }
+    if (response.statusCode == 401) {
+      throw const AppUpdateException('Sign in again to update.');
     }
     if (response.statusCode != 200) {
       throw AppUpdateException('The update could not be downloaded (error ${response.statusCode}).');

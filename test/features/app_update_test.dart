@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hris_mobile/core/config/env_store.dart';
+import 'package:hris_mobile/core/http/api_exception.dart';
 import 'package:hris_mobile/features/app_update/apk_installer.dart';
 import 'package:hris_mobile/features/app_update/app_update_api.dart';
 import 'package:hris_mobile/features/app_update/app_update_controller.dart';
@@ -144,12 +145,80 @@ void main() {
     });
   });
 
+  group('the download pass', () {
+    AppRelease signed(List<int> bytes) => release(sha: sha256.convert(bytes).toString());
+    final ok = jsonEncode({'success': true, 'data': {'download_path': '/api/mobile-app/download/12?ticket=abc'}});
+
+    test('signed in: asks for the pass with the session, downloads with the pass and no token', () async {
+      final bytes = [1, 2, 3];
+      final seen = <http.BaseRequest>[];
+      final client = MockClient.streaming((request, _) async {
+        seen.add(request);
+        if (request.method == 'POST') return http.StreamedResponse(Stream.value(utf8.encode(ok)), 200);
+        return http.StreamedResponse(Stream.value(bytes), 200, contentLength: bytes.length);
+      });
+      final cache = Directory.systemTemp.createTempSync('hris-cache-');
+      final api = HttpAppUpdateApi(baseUrl: 'https://sandbox.test', appVersion: '1.7.0+11', client: client, cacheDir: () async => cache, tokenProvider: () async => 'SESSION');
+      await api.download(signed(bytes));
+      expect(seen.first.url.path, '/api/auth/app-download');
+      expect(seen.first.headers['Authorization'], 'Bearer SESSION');
+      expect(seen.last.url.path, '/api/mobile-app/download/12');
+      expect(seen.last.url.queryParameters['ticket'], 'abc');
+      expect(seen.last.headers.containsKey('Authorization'), isFalse);
+    });
+
+    test('a server with no passes yet (404): the plain address still works', () async {
+      final bytes = [1, 2, 3];
+      final client = MockClient.streaming((request, _) async {
+        if (request.method == 'POST') {
+          return http.StreamedResponse(Stream.value(utf8.encode(jsonEncode({'success': false, 'message': 'Not found'}))), 404);
+        }
+        expect(request.url.hasQuery, isFalse);
+        return http.StreamedResponse(Stream.value(bytes), 200, contentLength: bytes.length);
+      });
+      final cache = Directory.systemTemp.createTempSync('hris-cache-');
+      final api = HttpAppUpdateApi(baseUrl: 'https://sandbox.test', appVersion: '1.7.0+11', client: client, cacheDir: () async => cache, tokenProvider: () async => 'SESSION');
+      expect((await api.download(signed(bytes))).readAsBytesSync(), bytes);
+    });
+
+    test('refused: the server\'s own words reach the employee, and nothing downloads', () async {
+      var files = 0;
+      final client = MockClient.streaming((request, _) async {
+        if (request.method == 'POST') {
+          return http.StreamedResponse(Stream.value(utf8.encode(jsonEncode({'success': false, 'message': 'Ask HR to enable it.', 'error': {'code': 'APP_DOWNLOAD_NOT_ALLOWED'}}))), 403);
+        }
+        files += 1;
+        return http.StreamedResponse(const Stream.empty(), 200);
+      });
+      final cache = Directory.systemTemp.createTempSync('hris-cache-');
+      final api = HttpAppUpdateApi(baseUrl: 'https://sandbox.test', appVersion: '1.7.0+11', client: client, cacheDir: () async => cache, tokenProvider: () async => 'SESSION');
+      await expectLater(api.download(release()), throwsA(isA<ApiException>().having((e) => e.message, 'message', contains('Ask HR'))));
+      expect(files, 0);
+    });
+
+    test('a locked file with no pass (401): says to sign in', () async {
+      final client = MockClient.streaming((request, _) async => http.StreamedResponse(const Stream.empty(), 401));
+      final cache = Directory.systemTemp.createTempSync('hris-cache-');
+      final api = HttpAppUpdateApi(baseUrl: 'https://sandbox.test', appVersion: '1.7.0+11', client: client, cacheDir: () async => cache);
+      await expectLater(api.download(release()), throwsA(isA<AppUpdateException>().having((e) => e.message, 'message', contains('Sign in'))));
+    });
+
+    test('signed out: Update does nothing', () async {
+      final env = await loadedEnv();
+      final api = FakeUpdateApi(UpdateInfo(latest: release()));
+      final c = AppUpdateController(env: env, currentVersionCode: 11, currentVersionName: '1.7.0', apiFor: (_) => api, installer: FakeInstaller());
+      await c.check(force: true);
+      await c.startUpdate();
+      expect(api.downloads, 0);
+    });
+  });
+
   group('the controller', () {
     test('update: asks for the install permission first when Android has not allowed it', () async {
       final env = await loadedEnv();
       final api = FakeUpdateApi(UpdateInfo(latest: release()));
       final installer = FakeInstaller(allowed: false);
-      final c = AppUpdateController(env: env, currentVersionCode: 11, currentVersionName: '1.7.0', apiFor: (_) => api, installer: installer);
+      final c = AppUpdateController(env: env, signedIn: true, currentVersionCode: 11, currentVersionName: '1.7.0', apiFor: (_) => api, installer: installer);
       await c.check(force: true);
       expect(c.verdict, UpdateVerdict.available);
 
@@ -167,14 +236,14 @@ void main() {
     test('a failed download is reported in its own words; a failed CHECK is silent', () async {
       final env = await loadedEnv();
       final api = FakeUpdateApi(UpdateInfo(latest: release()))..downloadError = const AppUpdateException('The downloaded update was damaged. Try again.');
-      final c = AppUpdateController(env: env, currentVersionCode: 11, currentVersionName: '1.7.0', apiFor: (_) => api, installer: FakeInstaller());
+      final c = AppUpdateController(env: env, signedIn: true, currentVersionCode: 11, currentVersionName: '1.7.0', apiFor: (_) => api, installer: FakeInstaller());
       await c.check(force: true);
       await c.startUpdate();
       expect(c.phase, UpdatePhase.failed);
       expect(c.error, contains('damaged'));
 
       final offline = FakeUpdateApi(const UpdateInfo())..latestError = const SocketException('offline');
-      final quiet = AppUpdateController(env: env, currentVersionCode: 11, currentVersionName: '1.7.0', apiFor: (_) => offline, installer: FakeInstaller());
+      final quiet = AppUpdateController(env: env, signedIn: true, currentVersionCode: 11, currentVersionName: '1.7.0', apiFor: (_) => offline, installer: FakeInstaller());
       await quiet.check(force: true);
       expect(quiet.verdict, UpdateVerdict.none);
       expect(quiet.error, isNull);
@@ -183,7 +252,7 @@ void main() {
     test('Later hides the prompt until something newer is published', () async {
       final env = await loadedEnv();
       final api = FakeUpdateApi(UpdateInfo(latest: release(code: 12)));
-      final c = AppUpdateController(env: env, currentVersionCode: 11, currentVersionName: '1.7.0', apiFor: (_) => api, installer: FakeInstaller());
+      final c = AppUpdateController(env: env, signedIn: true, currentVersionCode: 11, currentVersionName: '1.7.0', apiFor: (_) => api, installer: FakeInstaller());
       await c.check(force: true);
       expect(c.showsPrompt, isTrue);
       c.dismiss();
@@ -197,9 +266,9 @@ void main() {
   });
 
   group('the gate', () {
-    Future<AppUpdateController> mountGate(WidgetTester tester, UpdateInfo info, {int current = 11}) async {
+    Future<AppUpdateController> mountGate(WidgetTester tester, UpdateInfo info, {int current = 11, bool signedIn = true}) async {
       final env = await loadedEnv();
-      final c = AppUpdateController(env: env, currentVersionCode: current, currentVersionName: '1.7.0', apiFor: (_) => FakeUpdateApi(info), installer: FakeInstaller());
+      final c = AppUpdateController(env: env, signedIn: signedIn, currentVersionCode: current, currentVersionName: '1.7.0', apiFor: (_) => FakeUpdateApi(info), installer: FakeInstaller());
       await tester.pumpWidget(ChangeNotifierProvider<AppUpdateController>.value(
         value: c,
         child: MaterialApp(
@@ -229,6 +298,57 @@ void main() {
       expect(find.text('Update required'), findsOneWidget);
       expect(find.text('Update now'), findsOneWidget);
       expect(find.text('Later'), findsNothing);
+    });
+
+    testWidgets('signed out, available: says so, with no download; after sign-in the Update card', (tester) async {
+      final c = await mountGate(tester, UpdateInfo(latest: release(notes: 'The Reason label.')), signedIn: false);
+      expect(find.text('THE APP'), findsOneWidget);
+      expect(find.text('Update available'), findsOneWidget);
+      expect(find.textContaining('Sign in to update.'), findsOneWidget);
+      expect(find.textContaining("What's new"), findsNothing);
+      expect(find.text('Update'), findsNothing);
+      expect(find.text('Later'), findsNothing);
+
+      await tester.tap(find.text('OK'));
+      await tester.pump();
+      expect(find.text('Update available'), findsNothing);
+
+      c.setSession(signedIn: true, settled: true);
+      await tester.pump();
+      expect(find.text('Update available'), findsOneWidget, reason: 'OK at the login does not hide the real prompt');
+      expect(find.text('Update'), findsOneWidget);
+      expect(find.text('Later'), findsOneWidget);
+      expect(find.textContaining("What's new"), findsOneWidget);
+    });
+
+    testWidgets('signed out, required: the screen leads to sign-in, then back to Update now', (tester) async {
+      final c = await mountGate(tester, UpdateInfo(latest: release(), minVersionCode: 12), signedIn: false);
+      expect(find.text('THE APP'), findsNothing);
+      expect(find.text('Update required'), findsOneWidget);
+      expect(find.textContaining('Sign in to install version 1.7.1.'), findsOneWidget);
+      expect(find.textContaining("Can't sign in here?"), findsOneWidget);
+      expect(find.text('Update now'), findsNothing);
+
+      await tester.tap(find.text('Sign in'));
+      await tester.pump();
+      expect(find.text('THE APP'), findsOneWidget, reason: 'the login screen must be reachable');
+      expect(find.text('Update required'), findsNothing);
+
+      c.setSession(signedIn: true, settled: true);
+      await tester.pump();
+      expect(find.text('THE APP'), findsNothing);
+      expect(find.text('Update now'), findsOneWidget);
+
+      c.setSession(signedIn: false, settled: true);
+      await tester.pump();
+      expect(find.text('Sign in'), findsOneWidget, reason: 'signed out again: the screen returns');
+    });
+
+    testWidgets('while the stored session is checked: no prompt at all', (tester) async {
+      final c = await mountGate(tester, UpdateInfo(latest: release()), signedIn: false);
+      c.setSession(signedIn: false, settled: false);
+      await tester.pump();
+      expect(find.text('Update available'), findsNothing);
     });
 
     testWidgets('nothing newer: just the app', (tester) async {

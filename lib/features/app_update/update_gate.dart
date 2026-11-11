@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/app_card.dart';
 import 'app_update_controller.dart';
-import 'app_update_models.dart';
 
 /// Sits ABOVE every screen (MaterialApp.builder), so the update prompt reaches the
 /// employee wherever they are — the login screen included.
@@ -49,7 +48,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final c = context.watch<AppUpdateController?>();
     if (c == null) return widget.child;
-    if (c.verdict == UpdateVerdict.required && c.release != null) {
+    if (c.showsRequiredScreen && c.release != null) {
       return _UpdateRequiredScreen(controller: c);
     }
     return Stack(
@@ -139,6 +138,8 @@ class _UpdateBody extends StatelessWidget {
         ? TextStyle(fontSize: HrisType.heading, fontWeight: HrisType.semibold, height: 28 / 20, color: t.text)
         : TextStyle(fontSize: HrisType.md, fontWeight: HrisType.semibold, height: 24 / 16, color: t.text);
     final bodyStyle = TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text2);
+    // Signed out: it can say an update exists, but the download needs a sign-in.
+    final atLogin = !controller.signedIn && controller.phase == UpdatePhase.idle;
 
     final (String title, String body) = switch (controller.phase) {
       UpdatePhase.downloading => (
@@ -154,10 +155,18 @@ class _UpdateBody extends StatelessWidget {
       UpdatePhase.idle => required
           ? (
               'Update required',
-              'This version of ATLAS (${controller.currentVersionName}) is no longer supported. '
-                  'Install version ${r.versionName} (${r.sizeLabel}) to keep using the app.',
+              atLogin
+                  ? 'This version of ATLAS (${controller.currentVersionName}) is no longer supported. '
+                      'Sign in to install version ${r.versionName}.'
+                  : 'This version of ATLAS (${controller.currentVersionName}) is no longer supported. '
+                      'Install version ${r.versionName} (${r.sizeLabel}) to keep using the app.',
             )
-          : ('Update available', 'Version ${r.versionName} is ready to install (${r.sizeLabel}).'),
+          : (
+              'Update available',
+              atLogin
+                  ? 'Version ${r.versionName} is ready to install (${r.sizeLabel}). Sign in to update.'
+                  : 'Version ${r.versionName} is ready to install (${r.sizeLabel}).',
+            ),
     };
 
     final busy = controller.phase == UpdatePhase.downloading || controller.phase == UpdatePhase.installing;
@@ -170,7 +179,7 @@ class _UpdateBody extends StatelessWidget {
         Text(title, style: titleStyle, textAlign: required ? TextAlign.center : TextAlign.start),
         const SizedBox(height: HrisSpace.s1),
         Text(body, style: bodyStyle, textAlign: required ? TextAlign.center : TextAlign.start),
-        if (notes != null && notes.isNotEmpty && controller.phase == UpdatePhase.idle) ...[
+        if (notes != null && notes.isNotEmpty && controller.phase == UpdatePhase.idle && !atLogin) ...[
           const SizedBox(height: HrisSpace.s2),
           Text("What's new: $notes", style: bodyStyle, maxLines: 4, overflow: TextOverflow.ellipsis),
         ],
@@ -180,7 +189,24 @@ class _UpdateBody extends StatelessWidget {
         ],
         // Required: one full-width primary action, as the web gate. Optional:
         // Later + Update at the end of the row.
-        if (!busy && required) ...[
+        if (atLogin && required) ...[
+          const SizedBox(height: HrisSpace.s4),
+          FilledButton(onPressed: controller.goToSignIn, child: const Text('Sign in')),
+          const SizedBox(height: HrisSpace.s3),
+          Text(
+            "Can't sign in here? Open ATLAS in your phone's browser, sign in, and download the app from there.",
+            style: bodyStyle,
+            textAlign: TextAlign.center,
+          ),
+        ],
+        if (atLogin && !required) ...[
+          const SizedBox(height: HrisSpace.s3),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [FilledButton(onPressed: controller.okAtLogin, child: const Text('OK'))],
+          ),
+        ],
+        if (!busy && required && !atLogin) ...[
           const SizedBox(height: HrisSpace.s4),
           if (controller.phase == UpdatePhase.needsPermission)
             FilledButton(onPressed: controller.openInstallSettings, child: const Text('Open settings'))
@@ -190,7 +216,7 @@ class _UpdateBody extends StatelessWidget {
               child: Text(controller.phase == UpdatePhase.failed ? 'Try again' : 'Update now'),
             ),
         ],
-        if (!busy && !required) ...[
+        if (!busy && !required && !atLogin) ...[
           const SizedBox(height: HrisSpace.s3),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,

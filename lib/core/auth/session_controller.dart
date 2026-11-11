@@ -82,6 +82,9 @@ class SessionController extends ChangeNotifier {
   /// location recording.
   bool get hasStoredSession => _record != null;
 
+  /// The token held for this environment, for the update download's pass.
+  String? get token => _record?.token;
+
   /// The API client for the current environment (rebuilt on a URL change).
   ApiClient get client {
     final base = _env.config.baseUrl;

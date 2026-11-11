@@ -29,6 +29,11 @@ enum UpdatePhase {
 ///
 /// A failed CHECK is silent — no network must never nag or block anyone. Only an
 /// update the employee started reports errors.
+///
+/// SIGNED OUT (2026-11-07): the app is only for people given access, so the file
+/// needs a sign-in. The login screen still says an update exists, but offers no
+/// download: an available update is a card with OK, and a required one a screen
+/// that leads to sign-in (it must not block the only way to update).
 class AppUpdateController extends ChangeNotifier {
   final EnvStore env;
   final int currentVersionCode;
@@ -45,6 +50,7 @@ class AppUpdateController extends ChangeNotifier {
     required this.apiFor,
     this.installer = const PlatformApkInstaller(),
     this.recheckAfter = const Duration(minutes: 30),
+    this._signedIn = false,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now {
     _baseUrl = env.config.baseUrl;
@@ -63,7 +69,19 @@ class AppUpdateController extends ChangeNotifier {
   String? _error;
   File? _downloaded;
   int? _downloadedCode;
+  bool _signedIn;
 
+  /// False while the stored session is still being checked: no prompt yet, or a
+  /// signed-in employee would see the login wording flash by.
+  bool _sessionSettled = true;
+
+  /// OK on the login card: gone until sign-in, where the card with Update shows.
+  bool _okAtLogin = false;
+
+  /// Sign in on the required screen: the login screen is let through.
+  bool _sentToSignIn = false;
+
+  bool get signedIn => _signedIn;
   UpdateVerdict get verdict => _verdict;
   AppRelease? get release => _info?.latest;
   UpdatePhase get phase => _phase;
@@ -72,8 +90,36 @@ class AppUpdateController extends ChangeNotifier {
 
   /// The optional prompt: shown while an update is available, not dismissed, or in
   /// progress. A REQUIRED update is a full screen instead (see UpdateGate).
-  bool get showsPrompt =>
-      _verdict == UpdateVerdict.available && (!_dismissed || _phase != UpdatePhase.idle);
+  bool get showsPrompt {
+    if (_verdict != UpdateVerdict.available || !_sessionSettled) return false;
+    if (_phase != UpdatePhase.idle) return true;
+    return _signedIn ? !_dismissed : !_okAtLogin;
+  }
+
+  /// The full screen a required update takes over the app with.
+  bool get showsRequiredScreen =>
+      _verdict == UpdateVerdict.required && _sessionSettled && (_signedIn || !_sentToSignIn);
+
+  /// Told by main.dart whenever the session changes.
+  void setSession({required bool signedIn, required bool settled}) {
+    if (signedIn == _signedIn && settled == _sessionSettled) return;
+    _signedIn = signedIn;
+    _sessionSettled = settled;
+    if (!signedIn) _sentToSignIn = false;
+    notifyListeners();
+  }
+
+  /// OK on the login card.
+  void okAtLogin() {
+    _okAtLogin = true;
+    notifyListeners();
+  }
+
+  /// Sign in on the required screen.
+  void goToSignIn() {
+    _sentToSignIn = true;
+    notifyListeners();
+  }
 
   void _onEnvChanged() {
     if (env.config.baseUrl == _baseUrl) return;
@@ -82,6 +128,8 @@ class AppUpdateController extends ChangeNotifier {
     _info = null;
     _verdict = UpdateVerdict.none;
     _dismissed = false;
+    _okAtLogin = false;
+    _sentToSignIn = false;
     _phase = UpdatePhase.idle;
     _error = null;
     notifyListeners();
@@ -101,7 +149,10 @@ class AppUpdateController extends ChangeNotifier {
       _info = info;
       _verdict = info.verdictFor(currentVersionCode);
       // "Later" lasts until something newer than what was dismissed is published.
-      if (info.latest?.versionCode != before) _dismissed = false;
+      if (info.latest?.versionCode != before) {
+        _dismissed = false;
+        _okAtLogin = false;
+      }
       notifyListeners();
     } catch (_) {
       // Silent on purpose — see the class comment.
@@ -122,7 +173,7 @@ class AppUpdateController extends ChangeNotifier {
 
   Future<void> startUpdate() async {
     final r = release;
-    if (r == null || _phase == UpdatePhase.downloading || _phase == UpdatePhase.installing) return;
+    if (r == null || !_signedIn || _phase == UpdatePhase.downloading || _phase == UpdatePhase.installing) return;
     _error = null;
     try {
       if (!await installer.canInstall()) {

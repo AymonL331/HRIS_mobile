@@ -471,7 +471,11 @@ class _WorksiteCard extends StatelessWidget {
 
     String line;
     StatusSet? set; // null = neutral
-    if (!ws.configured) {
+    if (controller.status!.travelOrderToday) {
+      // Approved travel order today (2026-11-11): the home radius does not apply.
+      final to = controller.status!.travelOrderNumber;
+      line = "Approved travel order${to != null ? ' $to' : ''}. Your branch's radius does not apply today.";
+    } else if (!ws.configured) {
       line = 'No worksite configured for your branch — punches are not range-checked.';
     } else if (fix == null) {
       line =
@@ -709,8 +713,9 @@ class _OutcomeCard extends StatelessWidget {
             'In range (${response.distanceM} m from the worksite).',
           if (response.within == false && response.distanceM != null)
             'Out of range (${response.distanceM} m from the worksite) — this punch is flagged for HR.',
+          if (response.travelOrder) "Your branch's radius does not apply today.",
           if (response.flagged && response.within != false)
-            'Flagged for HR: ${response.flagReason ?? 'see DTR'}.',
+            'Flagged for HR: ${locationFlagLabel(response.flagReason)}.',
           if (warnLowAccuracy)
             'Your GPS reading was coarse, so the punch is flagged for review.',
         ];

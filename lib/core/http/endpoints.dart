@@ -10,6 +10,9 @@ abstract final class Endpoints {
   /// download path comes back in the response.
   static const appUpdateLatest = '/api/mobile-app/latest';
 
+  /// A signed-in account's short-lived pass to download the APK (2026-11-07).
+  static const appDownload = '/api/auth/app-download';
+
   static const mobileClockStatus = '/api/me/mobile-clock/status';
   static const mobileClock = '/api/me/mobile-clock';
 

@@ -22,7 +22,11 @@ Map<String, dynamic> statusJson({
   Map<String, dynamic>? tracking,
   /// `face.self_enrollment` (server migration 061); omitted when null.
   Map<String, dynamic>? selfEnrollment,
+  /// An approved travel order covers today (2026-11-11).
+  bool travelOrderToday = false,
 }) => {
+      'travel_order_today': travelOrderToday,
+      'travel_order': travelOrderToday ? {'id': 9, 'to_number': 'TO-2026-0012', 'purpose': 'Baguio audit'} : null,
       'tracking': ?tracking,
       'server_time': '2026-09-11T00:12:33.000Z',
       'timezone': 'Asia/Manila',
@@ -81,6 +85,8 @@ Map<String, dynamic> clockedIn() => {
 class FakeClockApi implements ClockApi {
   Map<String, dynamic> status_ = statusJson();
   Object? punchError;
+  /// The punch lands on a travel-order day: no range verdict, reason travel_order.
+  bool travelOrderPunch = false;
   Object? challengeError;
   final punches = <Map<String, dynamic>>[];
   final challenges = <String>[];
@@ -110,7 +116,7 @@ class FakeClockApi implements ClockApi {
     // with the geotag rather than trusting that it did.
     punches.add({'direction': direction, ...fix.toJson(), ...capture.toJson()});
     if (punchError != null) throw punchError!;
-    status_ = statusJson(today: clockedIn());
+    status_ = statusJson(today: clockedIn(), travelOrderToday: status_['travel_order_today'] == true);
     return PunchResponse.fromJson({
       'direction': direction,
       'clock_in_at': '2026-09-11T00:13:00.000Z',
@@ -118,11 +124,18 @@ class FakeClockApi implements ClockApi {
       'attendance_log_id': 1,
       'server_time': '2026-09-11T00:13:00.500Z',
       'match_distance': 0.31,
-      'location': {
-        'flagged': false,
-        'flag_reason': null,
-        'worksite': {'distance_m': 41, 'within': true, 'radius_m': 200},
-      },
+      'location': travelOrderPunch
+          ? {
+              'flagged': false,
+              'flag_reason': 'travel_order',
+              'travel_order': true,
+              'worksite': {'distance_m': 250000, 'within': null, 'radius_m': 200},
+            }
+          : {
+              'flagged': false,
+              'flag_reason': null,
+              'worksite': {'distance_m': 41, 'within': true, 'radius_m': 200},
+            },
     });
   }
 

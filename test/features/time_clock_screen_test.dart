@@ -71,6 +71,23 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets("a travel-order day: no range line before, and the radius note after the punch", (tester) async {
+    final api = FakeClockApi()
+      ..status_ = statusJson(travelOrderToday: true)
+      ..travelOrderPunch = true;
+    final fixes = FakeFixService()
+      // Baguio — far outside the Head Office radius.
+      ..next = LocationFix(latitude: 16.4023, longitude: 120.596, accuracyM: 9, isMocked: false, at: DateTime.now());
+    await mount(tester, api, fixes);
+    expect(find.textContaining("Approved travel order TO-2026-0012. Your branch's radius does not apply today."), findsOneWidget);
+    expect(find.textContaining('Allowed radius'), findsNothing);
+    await tester.tap(find.widgetWithText(FilledButton, 'Time In'));
+    await settle(tester);
+    expect(find.textContaining("Timed in at 8:13 AM. Your branch's radius does not apply today."), findsOneWidget);
+    expect(find.textContaining('Out of range'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('a mocked fix is refused on the phone and nothing is sent', (tester) async {
     final api = FakeClockApi();
     final fixes = FakeFixService()..next = LocationFix(latitude: 1, longitude: 1, accuracyM: 4, isMocked: true, at: DateTime.now());

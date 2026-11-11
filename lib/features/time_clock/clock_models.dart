@@ -144,6 +144,15 @@ class ClockStatus {
   /// Whether the phone should be recording the work-hours trail right now.
   final TrackingState tracking;
 
+  /// An approved travel order covers today (2026-11-11): the home branch's radius
+  /// does not judge a punch, so the screen shows no in/out-of-range line. False
+  /// from a server that does not send it yet.
+  final bool travelOrderToday;
+
+  /// That order's number (e.g. TO-2026-0012), so the screen names it. Null when
+  /// there is none, or from a server that does not send it.
+  final String? travelOrderNumber;
+
   const ClockStatus({
     required this.serverTime,
     required this.timezone,
@@ -158,6 +167,8 @@ class ClockStatus {
     required this.consentGiven,
     required this.face,
     this.tracking = TrackingState.inactive,
+    this.travelOrderToday = false,
+    this.travelOrderNumber,
   });
 
   bool get canClockIn => today == null || today!.clockInAt == null;
@@ -187,6 +198,8 @@ class ClockStatus {
       consentGiven: _flag(consent['consent_given']),
       face: FaceGate.fromJson(j['face'] as Map<String, dynamic>?),
       tracking: TrackingState.fromJson(j['tracking'] as Map<String, dynamic>?),
+      travelOrderToday: j['travel_order_today'] == true,
+      travelOrderNumber: _text((j['travel_order'] as Map<String, dynamic>?)?['to_number']),
     );
   }
 }
@@ -208,6 +221,10 @@ class PunchResponse {
   /// say the punch was face-verified rather than merely claiming it.
   final double? matchDistance;
 
+  /// The punch fell on an approved travel-order day: the home radius did not
+  /// judge it (2026-11-11).
+  final bool travelOrder;
+
   const PunchResponse({
     required this.direction,
     required this.clockInAt,
@@ -219,6 +236,7 @@ class PunchResponse {
     required this.within,
     required this.radiusM,
     required this.matchDistance,
+    this.travelOrder = false,
   });
 
   bool get faceVerified => matchDistance != null;
@@ -239,6 +257,24 @@ class PunchResponse {
       within: ws?['within'] is bool ? ws!['within'] as bool : null,
       radiusM: _int(ws?['radius_m']),
       matchDistance: _num(j['match_distance']),
+      travelOrder: loc?['travel_order'] == true,
     );
   }
+}
+
+/// Plain words for a stored location flag reason (as the website's
+/// utils/geo#locationFlagLabel). `travel_order` is a note, not a flag.
+String locationFlagLabel(String? reason) {
+  const labels = {
+    'out_of_geofence': 'Outside worksite',
+    'low_accuracy': 'Low GPS accuracy',
+    'out_of_geofence+low_accuracy': 'Outside worksite · low accuracy',
+  };
+  if (reason == null || reason.isEmpty) return 'see DTR';
+  final parts = reason.split('+');
+  if (parts.contains('travel_order')) {
+    final rest = parts.where((p) => p != 'travel_order').join('+');
+    return rest.isEmpty ? 'Travel order' : '${labels[rest] ?? rest} · travel order';
+  }
+  return labels[reason] ?? reason;
 }

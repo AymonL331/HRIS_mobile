@@ -50,8 +50,13 @@ Future<void> main() async {
     env: envStore,
     currentVersionCode: versionCodeOf(version),
     currentVersionName: version.split('+').first,
-    apiFor: (baseUrl) => HttpAppUpdateApi(baseUrl: baseUrl, appVersion: version),
+    apiFor: (baseUrl) => HttpAppUpdateApi(baseUrl: baseUrl, appVersion: version, tokenProvider: () async => session.token),
   );
+  // The download needs a sign-in, so the update prompt follows the session.
+  void syncUpdateSession() =>
+      appUpdate.setSession(signedIn: session.isSignedIn, settled: session.state is! Bootstrapping);
+  session.addListener(syncUpdateSession);
+  syncUpdateSession();
 
   // Work-hours location tracking: the port the service talks back on, then the
   // UI-side driver. A REAL sign-out (token gone) or an environment switch ends

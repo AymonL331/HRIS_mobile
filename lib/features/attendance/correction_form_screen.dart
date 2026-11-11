@@ -30,6 +30,7 @@ class ProofCameraDenied implements Exception {
 // Mirrors the server's accepted types (imageUpload.validator ALLOWED_MIME) and the
 // 5 MB cap. Checked here only to fail fast — the server re-validates the bytes.
 const _maxMb = 5;
+const _maxPhotos = 5; // the server allows 5 (migration 114)
 
 /// The type from the first bytes (JPEG FF D8 FF, PNG 89 50 4E 47, GIF "GIF8",
 /// WEBP "RIFF….WEBP"), never from the file name. Null = not one we accept.
@@ -107,7 +108,7 @@ class _CorrectionFormScreenState extends State<CorrectionFormScreen> {
   String? _date;
   TimeOfDay? _in;
   TimeOfDay? _out;
-  PickedProof? _proof;
+  final List<PickedProof> _proofs = [];
   Map<String, String> _errors = {};
   String? _formError;
   bool _busy = false;
@@ -200,7 +201,7 @@ class _CorrectionFormScreenState extends State<CorrectionFormScreen> {
         if (problem != null) {
           _errors = {..._errors, 'proof': problem};
         } else {
-          _proof = picked;
+          _proofs.add(picked);
           _errors = {..._errors}..remove('proof');
         }
       });
@@ -217,7 +218,7 @@ class _CorrectionFormScreenState extends State<CorrectionFormScreen> {
       if (_date == null) 'date': 'Select the date to correct.',
       if (_in == null && _out == null) 'clock_in': 'Enter a corrected clock-in and/or clock-out.',
       if (reason.isEmpty) 'reason': 'Explain why you were not able to clock out.',
-      if (_proof == null) 'proof': 'Attach a photo proving you were at the office.',
+      if (_proofs.isEmpty) 'proof': 'Attach a photo proving you were at the office.',
     };
     setState(() {
       _errors = local;
@@ -227,15 +228,20 @@ class _CorrectionFormScreenState extends State<CorrectionFormScreen> {
 
     setState(() => _busy = true);
     try {
-      // 1) Stage the photo. A failure here must NOT leave a request without its
-      //    evidence, so the correction is filed only once this succeeds.
-      final url = await widget.api.stageProof(bytes: _proof!.bytes, mimeType: _proof!.mimeType, name: _proof!.name);
-      if (url.isEmpty) throw const ApiException(status: 0, message: 'The proof photo could not be uploaded. Please try again.');
-      // 2) File it, carrying only the stored URL. employee_id is forced to me on the server.
+      // 1) Stage the photos. A failure here must NOT leave a request without its
+      //    evidence, so the correction is filed only once all succeed.
+      final urls = <String>[];
+      for (final proof in _proofs) {
+        final url = await widget.api.stageProof(bytes: proof.bytes, mimeType: proof.mimeType, name: proof.name);
+        if (url.isEmpty) throw const ApiException(status: 0, message: 'The proof photo could not be uploaded. Please try again.');
+        urls.add(url);
+      }
+      // 2) File it, carrying only the stored URLs. employee_id is forced to me on the server.
       await widget.api.submitCorrection({
         'date': _date,
         'reason': reason,
-        'proof_photo_url': url,
+        'proof_photo_url': urls.first,
+        if (urls.length > 1) 'more_proof_photo_urls': urls.sublist(1),
         if (_in != null) 'requested_clock_in': manilaToUtcText(_date!, _in!),
         if (_out != null) 'requested_clock_out': manilaToUtcText(_date!, _out!),
       });
@@ -359,11 +365,11 @@ class _CorrectionFormScreenState extends State<CorrectionFormScreen> {
             const SizedBox(height: HrisSpace.s1),
             Text(
               'A CCTV screenshot, gate or door log, or a photo at your workstation that shows you were at the '
-              'office that day. JPEG, PNG, WEBP or GIF, up to $_maxMb MB.',
+              'office that day. Up to $_maxPhotos photos. JPEG, PNG, WEBP or GIF, up to $_maxMb MB each.',
               style: hintStyle,
             ),
             const SizedBox(height: HrisSpace.s2),
-            if (_proof != null)
+            for (final proof in _proofs) ...[
               Container(
                 decoration: BoxDecoration(
                   color: t.surface,
@@ -379,7 +385,7 @@ class _CorrectionFormScreenState extends State<CorrectionFormScreen> {
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 220),
                         child: Image.memory(
-                          _proof!.bytes,
+                          proof.bytes,
                           fit: BoxFit.contain,
                           semanticLabel: 'The selected proof photo',
                           // A file the phone cannot draw still uploads; the server judges it.
@@ -394,16 +400,21 @@ class _CorrectionFormScreenState extends State<CorrectionFormScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(_proof!.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: hintStyle),
+                          child: Text(proof.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: hintStyle),
                         ),
-                        OutlinedButton(onPressed: _busy ? null : () => setState(() => _proof = null), child: const Text('Remove')),
+                        OutlinedButton(onPressed: _busy ? null : () => setState(() => _proofs.remove(proof)), child: const Text('Remove')),
                       ],
                     ),
                   ],
                 ),
-              )
-            else
-              OutlinedButton(onPressed: _busy ? null : _chooseProof, child: const Text('Choose photo')),
+              ),
+              const SizedBox(height: HrisSpace.s2),
+            ],
+            if (_proofs.length < _maxPhotos)
+              OutlinedButton(
+                onPressed: _busy ? null : _chooseProof,
+                child: Text(_proofs.isEmpty ? 'Choose photo' : 'Add another photo'),
+              ),
             if (_errors['proof'] != null) ...[
               const SizedBox(height: HrisSpace.s1),
               Text(_errors['proof']!, style: TextStyle(fontSize: HrisType.xs, height: 18 / 12, color: t.danger.text)),
