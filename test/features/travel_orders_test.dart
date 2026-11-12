@@ -135,7 +135,7 @@ void main() {
     expect(find.text('Enter the purpose.'), findsOneWidget);
     expect(find.text('Select a start date.'), findsOneWidget);
     expect(find.text('Add at least one destination.'), findsOneWidget);
-    expect(find.text('Attach the approved travel authority (image).'), findsOneWidget);
+    expect(find.text('Attach the approved travel authority (a picture or a PDF).'), findsOneWidget);
     expect(api.created, isEmpty);
 
     await tester.enterText(find.widgetWithText(TextField, 'Purpose *'), 'Branch surprise visit');
@@ -147,7 +147,7 @@ void main() {
     await tester.tap(find.text('Use my location'));
     await tester.pumpAndSettle();
     expect(fixes.acquired, 1);
-    await tester.tap(find.text('Choose image'));
+    await tester.tap(find.text('Choose picture or PDF'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Choose from gallery'));
     await tester.pumpAndSettle();
@@ -164,6 +164,37 @@ void main() {
     expect(p['destinations'], [
       {'name': 'Daraga Branch', 'lat': 14.5515, 'lng': 121.0177},
     ]);
+  });
+
+  testWidgets('the authority may be a PDF (2026-11-12); half day is for a one-day trip', (tester) async {
+    final api = FakeTravelOrderApi();
+    await tester.pumpWidget(MaterialApp(
+      home: TravelOrderFormScreen(
+        api: api,
+        fixes: FakeFixService(),
+        pdfPicker: () async => PickedProof(bytes: jpeg, mimeType: 'application/pdf', name: 'authority.pdf'),
+      ),
+    ));
+    expect(find.text('Half day applies only when the start and end date are the same day.'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Purpose *'), 'Branch surprise visit');
+    await tester.tap(find.text('Select a date').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Place name'), 'Daraga Branch');
+    await tester.tap(find.text('Use my location'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Choose picture or PDF'));
+    await tester.tap(find.text('Choose picture or PDF'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Choose a PDF'));
+    await tester.pumpAndSettle();
+    expect(find.text('authority.pdf'), findsOneWidget);
+    await tester.tap(find.text('Submit request'));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['stage application/pdf authority.pdf']);
+    expect(api.created, hasLength(1));
   });
 
   testWidgets('a stop without a pin is refused on the phone', (tester) async {

@@ -29,6 +29,10 @@ class DtrDay {
   final String? shiftStart;
   final String? shiftEnd;
   final String? captureMethod;
+  // Correction trail (migration 080): this direction's time was set by an approved
+  // correction request or an admin, not by the employee's own punch.
+  final bool clockInCorrected;
+  final bool clockOutCorrected;
 
   const DtrDay({
     required this.date,
@@ -50,6 +54,8 @@ class DtrDay {
     required this.shiftStart,
     required this.shiftEnd,
     required this.captureMethod,
+    this.clockInCorrected = false,
+    this.clockOutCorrected = false,
   });
 
   factory DtrDay.fromJson(Map<String, dynamic> j) => DtrDay(
@@ -72,7 +78,19 @@ class DtrDay {
         shiftStart: j['shift_start_time'] as String?,
         shiftEnd: j['shift_end_time'] as String?,
         captureMethod: j['capture_method'] as String?,
+        clockInCorrected: j['clock_in_at'] != null && _flag(j['clock_in_corrected']),
+        clockOutCorrected: j['clock_out_at'] != null && _flag(j['clock_out_corrected']),
       );
+
+  /// "In corrected" / "Out corrected" / "In + out corrected", or null — the same
+  /// fact as the web DTR's Corrected chip (user 2026-11-12).
+  String? get correctedLabel => clockInCorrected && clockOutCorrected
+      ? 'In + out corrected'
+      : clockInCorrected
+          ? 'In corrected'
+          : clockOutCorrected
+              ? 'Out corrected'
+              : null;
 
   int get year => int.parse(date.substring(0, 4));
   int get month => int.parse(date.substring(5, 7));

@@ -77,6 +77,17 @@ void main() {
     expect(d.workedLabel, '8h 00m');
     // The model has no way to hold a coordinate.
     expect(d.toString().contains('14.55'), isFalse);
+    expect(d.correctedLabel, isNull);
+  });
+
+  test('a corrected time is marked, like the web DTR (2026-11-12)', () {
+    DtrDay day(Map<String, dynamic> extra, {String? outAt = '2026-11-12T09:00:00.000Z'}) =>
+        DtrDay.fromJson(row('2026-11-12', status: 'late', inAt: '2026-11-12T06:50:00.000Z', outAt: outAt, extra: extra));
+    expect(day({'clock_in_corrected': 1}).correctedLabel, 'In corrected');
+    expect(day({'clock_out_corrected': 1}).correctedLabel, 'Out corrected');
+    expect(day({'clock_in_corrected': 1, 'clock_out_corrected': 1}).correctedLabel, 'In + out corrected');
+    // No clock-out yet: nothing to mark on that side.
+    expect(day({'clock_out_corrected': 1}, outAt: null).correctedLabel, isNull);
   });
 
   test('the controller loads the current Manila month up to today, then walks back', () async {

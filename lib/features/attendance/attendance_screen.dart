@@ -271,6 +271,7 @@ class _DayTile extends StatelessWidget {
       if (day.isLate && day.lateMinutes > 0) ('Late ${hoursMinutes(day.lateMinutes)}', StatusTone.warning),
       if (day.isUndertime && day.undertimeMinutes > 0) ('Undertime ${hoursMinutes(day.undertimeMinutes)}', StatusTone.warning),
       if (day.isHalfDay) ('Half day', StatusTone.info),
+      if (day.correctedLabel != null) (day.correctedLabel!, StatusTone.warning),
       if (day.leaveTypeName != null)
         ('${day.leaveTypeName}${day.leaveDayPart != null && day.leaveDayPart != 'full' ? ' (${day.leaveDayPart!.toUpperCase()})' : ''}', StatusTone.success),
       if (day.holidayTitle != null) (day.holidayTitle!, StatusTone.info),

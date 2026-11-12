@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -11,6 +12,18 @@ import 'travel_order_api.dart';
 import 'travel_order_models.dart';
 
 const _maxMb = 5;
+const _maxPdfMb = 10;
+
+/// Picks a PDF of the approved travel authority (user 2026-11-12: "pdf aside from
+/// pictures"). Null when the person backed out. Widget tests pass a fake.
+typedef PdfPicker = Future<PickedProof?> Function();
+
+Future<PickedProof?> pickAuthorityPdf() async {
+  final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['pdf']);
+  if (files.isEmpty) return null;
+  final f = files.first;
+  return PickedProof(bytes: await f.readAsBytes(), mimeType: 'application/pdf', name: f.name);
+}
 
 /// A stop being typed: its name and, once pinned, its coordinates as text (the
 /// web form lets HR type them too).
@@ -37,13 +50,18 @@ class TravelOrderFormScreen extends StatefulWidget {
   final TravelOrderApi api;
   final LocationFixService fixes;
   final ProofPicker picker;
+  final PdfPicker pdfPicker;
 
-  const TravelOrderFormScreen({super.key, required this.api, required this.fixes, this.picker = pickProofPhoto});
+  const TravelOrderFormScreen(
+      {super.key, required this.api, required this.fixes, this.picker = pickProofPhoto, this.pdfPicker = pickAuthorityPdf});
 
   static Future<bool?> open(BuildContext context,
-          {required TravelOrderApi api, required LocationFixService fixes, ProofPicker picker = pickProofPhoto}) =>
+          {required TravelOrderApi api,
+          required LocationFixService fixes,
+          ProofPicker picker = pickProofPhoto,
+          PdfPicker pdfPicker = pickAuthorityPdf}) =>
       Navigator.of(context).push<bool>(
-        MaterialPageRoute(builder: (_) => TravelOrderFormScreen(api: api, fixes: fixes, picker: picker)),
+        MaterialPageRoute(builder: (_) => TravelOrderFormScreen(api: api, fixes: fixes, picker: picker, pdfPicker: pdfPicker)),
       );
 
   @override
@@ -71,6 +89,9 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
     super.dispose();
   }
 
+  /// A half day needs a one-day trip, like a leave request (user 2026-11-12).
+  bool get _multiDay => _from != null && _to != null && _from != _to;
+
   String _ymd(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _pickDate(bool from) async {
@@ -92,9 +113,11 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
       } else {
         _to = _ymd(picked);
       }
+      if (_multiDay) _dayType = 'whole_day';
       _errors = {..._errors}
         ..remove('date_from')
-        ..remove('date_to');
+        ..remove('date_to')
+        ..remove('day_type');
     });
   }
 
@@ -123,7 +146,7 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
   }
 
   Future<void> _chooseAuthority() async {
-    final source = await showModalBottomSheet<ImageSource>(
+    final source = await showModalBottomSheet<Object>(
       context: context,
       showDragHandle: true,
       builder: (ctx) => SafeArea(
@@ -141,6 +164,12 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
               title: const Text('Take a photo'),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('Choose a PDF'),
+              subtitle: const Text('A scanned copy of the approved travel authority'),
+              onTap: () => Navigator.pop(ctx, 'pdf'),
+            ),
             const SizedBox(height: HrisSpace.s2),
           ],
         ),
@@ -148,13 +177,14 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
     );
     if (source == null) return;
     try {
-      final picked = await widget.picker(source);
+      final picked = source == 'pdf' ? await widget.pdfPicker() : await widget.picker(source as ImageSource);
       if (picked == null || !mounted) return;
+      final isPdf = picked.mimeType == 'application/pdf';
       String? problem;
       if (picked.mimeType.isEmpty) {
-        problem = 'Unsupported image. Use JPEG, PNG, WEBP, or GIF.';
-      } else if (picked.bytes.length > _maxMb * 1024 * 1024) {
-        problem = 'That image is too large. Maximum size is $_maxMb MB.';
+        problem = 'Unsupported file. Use a picture (JPEG, PNG, WEBP, GIF) or a PDF.';
+      } else if (picked.bytes.length > (isPdf ? _maxPdfMb : _maxMb) * 1024 * 1024) {
+        problem = isPdf ? 'That PDF is too large. Maximum size is $_maxPdfMb MB.' : 'That image is too large. Maximum size is $_maxMb MB.';
       }
       setState(() {
         if (problem != null) {
@@ -194,7 +224,8 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
       }
     }
     if (stops.isEmpty && !local.keys.any((k) => k.startsWith('stop'))) local['destinations'] = 'Add at least one destination.';
-    if (_authority == null) local['file'] = 'Attach the approved travel authority (image).';
+    if (_multiDay && _dayType != 'whole_day') local['day_type'] = 'Half day applies only when the start and end date are the same day.';
+    if (_authority == null) local['file'] = 'Attach the approved travel authority (a picture or a PDF).';
     setState(() {
       _errors = local;
       _formError = null;
@@ -309,10 +340,19 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
             ),
             const SizedBox(height: HrisSpace.s4),
             DropdownButtonFormField<String>(
+              // Keyed on the value so a reset to Whole Day (dates now differ) shows.
+              key: ValueKey('day-type-$_dayType'),
               initialValue: _dayType,
-              decoration: const InputDecoration(labelText: 'Day type', floatingLabelBehavior: FloatingLabelBehavior.always),
+              decoration: InputDecoration(
+                labelText: 'Day type',
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+                helperText: 'Half day applies only when the start and end date are the same day.',
+                helperMaxLines: 2,
+                errorText: _errors['day_type'],
+                errorMaxLines: 2,
+              ),
               items: [for (final e in toDayTypes.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-              onChanged: _busy ? null : (v) => setState(() => _dayType = v ?? 'whole_day'),
+              onChanged: _busy || _multiDay ? null : (v) => setState(() => _dayType = v ?? 'whole_day'),
             ),
             const SizedBox(height: HrisSpace.s5),
 
@@ -406,13 +446,13 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
             const SizedBox(height: HrisSpace.s4),
 
             Text.rich(
-              TextSpan(text: 'Approved travel authority (image)', children: [
+              TextSpan(text: 'Approved travel authority (picture or PDF)', children: [
                 TextSpan(text: ' *', style: TextStyle(color: t.danger.solid)),
               ]),
               style: TextStyle(fontSize: HrisType.sm, fontWeight: HrisType.medium, color: t.text),
             ),
             const SizedBox(height: HrisSpace.s1),
-            Text('JPEG, PNG, WEBP, or GIF, up to $_maxMb MB.', style: hintStyle),
+            Text('A picture (JPEG, PNG, WEBP, GIF) up to $_maxMb MB, or a PDF up to $_maxPdfMb MB.', style: hintStyle),
             const SizedBox(height: HrisSpace.s2),
             if (_authority != null)
               Container(
@@ -425,6 +465,14 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (_authority!.mimeType == 'application/pdf')
+                      SizedBox(
+                        height: 72,
+                        child: Center(
+                          child: Icon(Icons.picture_as_pdf_outlined, size: 40, color: t.muted, semanticLabel: 'The selected PDF'),
+                        ),
+                      )
+                    else
                     ClipRRect(
                       borderRadius: BorderRadius.circular(HrisRadius.control),
                       child: ConstrainedBox(
@@ -451,7 +499,7 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
                 ),
               )
             else
-              OutlinedButton(onPressed: _busy ? null : _chooseAuthority, child: const Text('Choose image')),
+              OutlinedButton(onPressed: _busy ? null : _chooseAuthority, child: const Text('Choose picture or PDF')),
             if (_errors['file'] != null) ...[
               const SizedBox(height: HrisSpace.s1),
               Text(_errors['file']!, style: errorStyle),
