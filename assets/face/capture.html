@@ -256,6 +256,10 @@
 
   let sequence = [];
   let includeFrame = false; // enrollment: also return the JPEG of the fingerprinted frame
+  // Time In/Out (server migration 117, 2026-11-13): also return the JPEG of the
+  // frame the punch was matched on, kept 30 days for tracing. Unlike enrollment,
+  // a punch never waits or fails for want of a photo.
+  let clockPhoto = false;
   let index = 0;
   let phase = 'idle'; // idle | running | done
   let actionStartedAt = 0;
@@ -429,8 +433,15 @@
     hintEl.textContent = '';
     for (let attempt = 0; attempt < 12; attempt += 1) {
       try {
-        const { faceCount, face } = await detectFace(video);
+        // With clockPhoto the face is read from a drawn frame, so the photo is the
+        // very frame that was matched (the same rule as enrollment).
+        const canvas = clockPhoto ? frameToCanvas() : null;
+        const { faceCount, face } = await detectFace(canvas || video);
         if (faceCount === 1 && face && isUsableEmbedding(face.embedding)) {
+          let photo = null;
+          if (canvas) {
+            try { photo = jpegBase64(mirroredCopy(canvas)); } catch (_) { photo = null; }
+          }
           phase = 'done';
           stopCamera();
           send({
@@ -440,6 +451,7 @@
             dims: face.embeddingDims,
             modelVersion: MODEL_VERSION,
             completed: sequence.map((c) => c.type),
+            ...(photo ? { photo } : {}),
           });
           return;
         }
@@ -528,6 +540,7 @@
   window.hrisStart = async function hrisStart(actions, options) {
     try {
       includeFrame = Boolean(options && options.includeFrame);
+      clockPhoto = Boolean(options && options.clockPhoto);
       const types = (Array.isArray(actions) ? actions : []).filter((t) => t === 'blink' || t === 'turn_head');
       if (types.length === 0) { fail('no_challenge'); return; }
 

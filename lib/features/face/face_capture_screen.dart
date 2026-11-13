@@ -62,6 +62,11 @@ class FaceCaptureScreen extends StatefulWidget {
   /// exact frame the embedding came from, and waits for a frontal face to take it.
   final bool includeFrame;
 
+  /// Time In/Out (server migration 117): also return the JPEG of the frame the
+  /// punch was matched on, kept 30 days for tracing. Optional: a punch never
+  /// fails for want of a photo.
+  final bool clockPhoto;
+
   /// Injected by the widget tests, which cannot run a WebView.
   @visibleForTesting
   final Future<FaceResult> Function()? debugRunner;
@@ -72,6 +77,7 @@ class FaceCaptureScreen extends StatefulWidget {
     required this.issueChallenge,
     this.title,
     this.includeFrame = false,
+    this.clockPhoto = false,
     this.debugRunner,
   });
 
@@ -234,7 +240,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
     // The server's ORDER, passed through untouched — the backend verifies the
     // response against the sequence it issued.
     await _web?.runJavaScript(
-      'window.hrisStart(${jsonEncode(challenge.actions)}, ${jsonEncode({'includeFrame': widget.includeFrame})})',
+      'window.hrisStart(${jsonEncode(challenge.actions)}, ${jsonEncode({'includeFrame': widget.includeFrame, 'clockPhoto': widget.clockPhoto})})',
     );
   }
 
@@ -314,6 +320,18 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                             ),
                           ],
                         ),
+                      ),
+                    ),
+                  // Migration 117: the employees signed a memorandum; say it on screen too.
+                  if (widget.clockPhoto)
+                    const Positioned(
+                      left: HrisSpace.s4,
+                      right: HrisSpace.s4,
+                      bottom: HrisSpace.s4,
+                      child: Text(
+                        'A photo is saved for tracing.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: HrisType.xs, color: HrisCamera.ink2),
                       ),
                     ),
                 ],

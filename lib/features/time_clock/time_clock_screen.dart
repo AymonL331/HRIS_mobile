@@ -612,6 +612,7 @@ class _PunchButtons extends StatelessWidget {
           builder: (_) => FaceCaptureScreen(
             direction: direction,
             issueChallenge: controller.api.faceChallenge,
+            clockPhoto: true,
           ),
           fullscreenDialog: true,
         ),

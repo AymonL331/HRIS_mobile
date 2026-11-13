@@ -86,6 +86,21 @@ void main() {
       expect(body['liveness_passed'], isTrue);
     });
 
+    test('a punch carries the photo of the frame when the page took one (server migration 117)', () {
+      expect(fakeCapture().toJson().containsKey('photo'), isFalse, reason: 'no photo, no key — an older page still punches');
+      final withPhoto = FaceCapture(
+        nonce: 'a' * 64, embedding: List<double>.generate(128, (i) => (i + 1) / 128), dims: 128,
+        modelVersion: 'human-3', completedChallenges: const ['blink'], photoJpegBase64: '/9j/AAAA',
+      );
+      expect(withPhoto.toJson()['photo'], {'type': 'image/jpeg', 'data': '/9j/AAAA'});
+      final tooBig = FaceCapture(
+        nonce: 'a' * 64, embedding: List<double>.generate(128, (i) => (i + 1) / 128), dims: 128,
+        modelVersion: 'human-3', completedChallenges: const ['blink'],
+        photoJpegBase64: 'A' * (FaceCapture.maxPhotoBase64Length + 1),
+      );
+      expect(tooBig.toJson().containsKey('photo'), isFalse, reason: 'over the server cap: the punch goes without it');
+    });
+
     test('an embedding outside the bounds the server accepts is refused on-device', () {
       final tooShort = FaceCapture(
         nonce: 'a' * 64, embedding: List<double>.filled(32, 0.1), dims: 32,

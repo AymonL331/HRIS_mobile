@@ -32,10 +32,11 @@ class FaceCapture {
   final String modelVersion;
   final List<String> completedChallenges;
 
-  /// ENROLLMENT ONLY (server migration 061): base64 JPEG of the exact frame the
-  /// embedding was computed from, so HR can compare it with the employee before
-  /// approving. Null on a punch. Like the embedding, it is biometric data: never
-  /// logged, never cached on the device, sent only in the enrollment request.
+  /// Base64 JPEG of the exact frame the embedding was computed from. Enrollment
+  /// (server migration 061): so HR can compare it with the employee before
+  /// approving. Time In/Out (server migration 117): kept 30 days for tracing;
+  /// may be null on a punch. Like the embedding, it is biometric data: never
+  /// logged, never cached on the device, sent only in its request.
   final String? photoJpegBase64;
 
   const FaceCapture({
@@ -80,6 +81,8 @@ class FaceCapture {
         'liveness_passed': true,
         'completed_challenges': completedChallenges,
         'model_version': modelVersion,
+        // The photo of the frame (server migration 117), when the page took one.
+        if (hasPhoto) 'photo': {'type': 'image/jpeg', 'data': photoJpegBase64},
       };
 
   /// Deliberately says nothing about the vector or the photo: both are biometric
