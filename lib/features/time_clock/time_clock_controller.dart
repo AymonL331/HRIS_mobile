@@ -54,6 +54,21 @@ class PunchNeedsConsent extends PunchOutcome {
   const PunchNeedsConsent();
 }
 
+/// Refused on the phone at clock-in: a setting work-hours recording needs is
+/// off (location "all the time", precise, notifications, battery). The screen
+/// offers a "Fix it" button (2026-11-13).
+class PunchNeedsSetup extends PunchOutcome {
+  final String message;
+  const PunchNeedsSetup(this.message);
+}
+
+/// The clock-in check: null = ready, otherwise what to fix.
+typedef ClockInCheck = Future<String?> Function();
+
+/// Runs before a clock-out with the open shift's id; false = the employee
+/// cancelled (e.g. the "explain your gaps" dialog).
+typedef BeforeClockOut = Future<bool> Function(int attendanceLogId);
+
 /// The Time Clock's brain: the status load, the range check, the punch flow.
 /// Every tap on In/Out takes a FRESH fix — a cached position is never sent.
 class TimeClockController extends ChangeNotifier {
@@ -70,6 +85,13 @@ class TimeClockController extends ChangeNotifier {
   /// not about reminders.
   final ReminderSync? reminders;
 
+  /// Re-checked at EVERY clock-in (2026-11-13). Null in tests not about it.
+  final ClockInCheck? clockInCheck;
+
+  /// Asked before every clock-out of a recorded shift. Set by the screen, which
+  /// owns the dialog's BuildContext. Null = nothing to ask.
+  BeforeClockOut? beforeClockOut;
+
   bool _loading = false;
   String? _loadError;
   ClockStatus? _status;
@@ -80,8 +102,15 @@ class TimeClockController extends ChangeNotifier {
   bool _consentSaving = false;
   bool _disposed = false;
 
-  TimeClockController({required this.api, required this.fixes, ServerClock? clock, this.tracking, this.reminders})
-      : clock = clock ?? ServerClock();
+  TimeClockController({
+    required this.api,
+    required this.fixes,
+    ServerClock? clock,
+    this.tracking,
+    this.reminders,
+    this.clockInCheck,
+    this.beforeClockOut,
+  }) : clock = clock ?? ServerClock();
 
   bool get loading => _loading;
   String? get loadError => _loadError;
@@ -190,6 +219,26 @@ class TimeClockController extends ChangeNotifier {
     _outcome = null;
     _phase = ClockPhase.locating;
     _notify();
+
+    // Everything recording needs, read again now — a setting turned off since
+    // the last check must not cost a whole shift of location (2026-11-13).
+    final check = clockInCheck;
+    if (direction == 'in' && check != null) {
+      final problem = await check();
+      if (problem != null) {
+        _fail(PunchNeedsSetup(problem));
+        return;
+      }
+    }
+    // Long gaps on this shift need the employee's reason before clock-out.
+    final shiftId = _status?.tracking.attendanceLogId;
+    final ask = beforeClockOut;
+    if (direction == 'out' && shiftId != null && ask != null) {
+      if (!await ask(shiftId)) {
+        _fail(null);
+        return;
+      }
+    }
 
     LocationFix fix;
     try {

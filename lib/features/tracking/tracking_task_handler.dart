@@ -5,14 +5,15 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/auth/session_store.dart';
 import '../../core/http/api_client.dart';
 import '../../core/http/endpoints.dart';
-import '../../core/time/manila_time.dart';
 import 'ping_queue.dart';
 import 'ping_uploader.dart';
 import 'tracking_config.dart';
+import 'tracking_foreground.dart';
 import 'tracking_models.dart';
 
 /// The service's entry point. Top-level and kept by `vm:entry-point` because
@@ -59,6 +60,17 @@ class TrackingTaskHandler extends TaskHandler {
   bool _permissionNoted = false;
   bool _stopping = false;
   bool _ticking = false;
+  final TrackingAlerts _alerts = TrackingAlerts();
+  String? _lastNotice;
+
+  /// The last "alive" minute written BEFORE this start (null = none / handled).
+  DateTime? _aliveBeforeStart;
+
+  /// Written every minute while recording; read after a reboot to say WHEN the
+  /// phone went off (migration 119). `bootedAtKey` is written by the Android
+  /// boot receiver (BootMarkReceiver.kt) — same SharedPreferences file.
+  static const lastAliveKey = 'tracking.last_alive_at';
+  static const bootedAtKey = 'tracking.booted_at';
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -84,9 +96,14 @@ class TrackingTaskHandler extends TaskHandler {
       ),
     );
 
-    // Started by the SYSTEM = restarted after the phone killed the service or
-    // rebooted. Saying so is what lets the website label the silence before it.
-    await _event(starter == TaskStarter.system ? 'resumed_after_kill' : 'start');
+    // Started by the SYSTEM (or by our watchdog) = restarted after the phone
+    // killed the service or rebooted. Saying so is what lets the website label
+    // the silence before it.
+    final byWatchdog = await FlutterForegroundTask.getData<bool>(key: watchdogRestartKey) == true;
+    if (byWatchdog) await FlutterForegroundTask.removeData(key: watchdogRestartKey);
+    await _readAliveBeforeStart();
+    await _notePhoneOff();
+    await _event(starter == TaskStarter.system || byWatchdog ? 'resumed_after_kill' : 'start');
     await _startPositions();
     await _tick();
   }
@@ -188,6 +205,9 @@ class TrackingTaskHandler extends TaskHandler {
     final c = _config;
     final q = _queue;
     if (c == null || q == null || _stopping) return;
+    // A fix again: whatever was wrong is fixed — take the alert away.
+    if (_locationOffNoted) unawaited(_alerts.clear(TrackingAlert.locationOff));
+    if (_permissionNoted) unawaited(_alerts.clear(TrackingAlert.permissionLost));
     _locationOffNoted = false;
     _permissionNoted = false;
     await q.add(QueuedPing(
@@ -223,17 +243,65 @@ class TrackingTaskHandler extends TaskHandler {
     _lastQueuedAt = DateTime.now().toUtc();
   }
 
-  // Once per episode: a phone with location off for an hour records ONE event.
+  // Once per episode: a phone with location off for an hour records ONE event —
+  // and the employee gets ONE "turn it back on" notification (2026-11-13).
   Future<void> _noteLocationOff() async {
     if (_locationOffNoted) return;
     _locationOffNoted = true;
     await _event('gap_location_off');
+    await _alerts.show(TrackingAlert.locationOff);
   }
 
   Future<void> _notePermissionLost() async {
     if (_permissionNoted) return;
     _permissionNoted = true;
     await _event('gap_permission_lost');
+    await _alerts.show(TrackingAlert.permissionLost);
+  }
+
+  /// After a reboot mid-shift: the boot receiver wrote when the phone started,
+  /// and the last minute tick before this start says when it was last alive. A
+  /// boot after that tick means the phone was OFF in between — recorded as
+  /// `phone_off` at that last tick, so the gap reads "The phone was turned off".
+  /// Checked at start AND on every tick until the boot mark is seen: the
+  /// plugin's boot receiver may start this service before ours writes it.
+  Future<void> _readAliveBeforeStart() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      _aliveBeforeStart = DateTime.tryParse(prefs.getString(lastAliveKey) ?? '');
+    } catch (_) {}
+  }
+
+  Future<void> _notePhoneOff() async {
+    final c = _config;
+    final alive = _aliveBeforeStart;
+    final q = _queue;
+    if (c == null || alive == null || q == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final booted = DateTime.tryParse(prefs.getString(bootedAtKey) ?? '');
+      if (booted == null) return;
+      await prefs.remove(bootedAtKey);
+      _aliveBeforeStart = null;
+      if (!alive.isAfter(c.since) || !booted.isAfter(alive)) return;
+      await q.add(QueuedPing(
+        uuid: newPingUuid(),
+        attendanceLogId: c.attendanceLogId,
+        kind: 'phone_off',
+        capturedAt: alive.toUtc(),
+      ));
+    } catch (e) {
+      debugPrint('tracking: phone-off check failed: $e');
+    }
+  }
+
+  Future<void> _markAlive() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(lastAliveKey, DateTime.now().toUtc().toIso8601String());
+    } catch (_) {}
   }
 
   Future<int?> _batteryPct() async {
@@ -256,6 +324,8 @@ class TrackingTaskHandler extends TaskHandler {
         await _finish('max_duration');
         return;
       }
+      if (_aliveBeforeStart != null) await _notePhoneOff();
+      await _markAlive();
       if (_positions == null) await _startPositions();
       if (_lastQueuedAt == null || now.difference(_lastQueuedAt!) >= Duration(seconds: c.policy.heartbeatS)) {
         await _heartbeat();
@@ -302,15 +372,18 @@ class TrackingTaskHandler extends TaskHandler {
     if (c == null) return;
     final queued = await _queue?.count() ?? 0;
     final last = _lastPointAt;
-    final text = [
-      'Since ${ManilaTime.time(c.since)}',
-      last != null ? 'last point ${ManilaTime.time(last)}' : 'waiting for GPS',
-      if (queued > 0) '$queued waiting to upload',
-    ].join(' · ');
-    await FlutterForegroundTask.updateService(
-      notificationTitle: 'ATLAS is recording your work location',
-      notificationText: text,
-    );
+    // The quiet notice (2026-11-13): the same words all shift, changed only when
+    // the employee must act — so it never lights up or redraws every minute.
+    final problem = _locationOffNoted
+        ? 'Location is off — turn it on'
+        : _permissionNoted
+            ? 'Location permission is off — open ATLAS'
+            : null;
+    final notice = problem ?? trackingNoticeText(c.since);
+    if (notice != _lastNotice) {
+      _lastNotice = notice;
+      await FlutterForegroundTask.updateService(notificationTitle: trackingNoticeTitle, notificationText: notice);
+    }
     FlutterForegroundTask.sendDataToMain({
       'running': true,
       'attendance_log_id': c.attendanceLogId,
@@ -341,6 +414,8 @@ class TrackingTaskHandler extends TaskHandler {
       }
     }
     await TrackingConfig.clear();
+    await _alerts.clearAll();
+    await disarmTrackingWatchdog();
     FlutterForegroundTask.sendDataToMain({'running': false, 'stop_reason': reason});
     await FlutterForegroundTask.stopService();
   }

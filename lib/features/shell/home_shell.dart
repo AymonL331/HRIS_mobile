@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/session_controller.dart';
+import '../../core/device/device_readiness_service.dart';
 import '../../core/location/location_fix.dart';
+import '../../core/location/location_gate_service.dart';
 import '../../shared/tokens.dart';
 import '../../shared/widgets/brand_mark.dart';
 import '../../shared/widgets/page_header.dart';
@@ -26,6 +28,7 @@ import '../settings/settings_screen.dart';
 import '../time_clock/clock_api.dart';
 import '../time_clock/time_clock_controller.dart';
 import '../time_clock/time_clock_screen.dart';
+import '../tracking/tracking_gaps.dart';
 import '../tracking/tracking_service.dart';
 import '../travel_orders/travel_order_api.dart';
 import '../travel_orders/travel_orders_screen.dart';
@@ -181,12 +184,30 @@ class _HomeShellState extends State<HomeShell> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<TimeClockController>(
-          create: (ctx) => TimeClockController(
-            api: ctx.read<ClockApi?>() ?? MobileClockApi(ctx.read<SessionController>()),
-            fixes: ctx.read<LocationFixService>(),
-            tracking: _trackingOf(ctx),
-            reminders: _optional<ReminderSync?>(ctx),
-          ),
+          create: (ctx) {
+            final tracking = _trackingOf(ctx);
+            final gate = _optional<LocationGateService>(ctx);
+            final device = _optional<DeviceReadinessService>(ctx);
+            return TimeClockController(
+              api: ctx.read<ClockApi?>() ?? MobileClockApi(ctx.read<SessionController>()),
+              fixes: ctx.read<LocationFixService>(),
+              tracking: tracking,
+              reminders: _optional<ReminderSync?>(ctx),
+              // Steps 2 + 5 of the tracking fix (2026-11-13): settings re-checked
+              // at every clock-in; long gaps explained before clock-out.
+              clockInCheck: gate == null || device == null
+                  ? null
+                  : () => trackingReadinessProblem(gate: gate, device: device),
+              beforeClockOut: tracking == null
+                  ? null
+                  : (id) => explainGapsBeforeClockOut(
+                        ctx,
+                        attendanceLogId: id,
+                        api: _optional<TrackingGapsApi?>(ctx) ?? MobileTrackingGapsApi(ctx.read<SessionController>()),
+                        tracking: tracking,
+                      ),
+            );
+          },
         ),
         // The bell. Not lazy: the badge and the 30 s poll must run from the
         // moment the shell is up, not from the first time the bell is drawn.

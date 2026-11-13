@@ -7,7 +7,7 @@ import '../../core/auth/session_controller.dart';
 import '../../core/time/manila_time.dart';
 import 'tracking_config.dart';
 import 'tracking_models.dart';
-import 'tracking_task_handler.dart';
+import 'tracking_foreground.dart';
 
 /// What the Time Clock shows about recording, as last reported by the service.
 class TrackingSnapshot {
@@ -55,6 +55,11 @@ abstract class TrackingService {
   Future<void> sync(TrackingState state);
 
   Future<void> stop({String reason = 'clocked_out'});
+
+  /// Send everything the phone is still holding NOW, and wait (up to [timeout])
+  /// until it is gone — so the server sees the whole shift before it is asked
+  /// which gaps need a reason (2026-11-13).
+  Future<void> flushNow({Duration timeout = const Duration(seconds: 10)});
 }
 
 class ForegroundTrackingService implements TrackingService {
@@ -76,26 +81,7 @@ class ForegroundTrackingService implements TrackingService {
 
   void _init() {
     if (_initialized) return;
-    FlutterForegroundTask.init(
-      androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'work_location',
-        channelName: 'Work location recording',
-        channelDescription: 'Shown while ATLAS records your location between clock-in and clock-out.',
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
-        onlyAlertOnce: true,
-      ),
-      iosNotificationOptions: const IOSNotificationOptions(showNotification: false, playSound: false),
-      foregroundTaskOptions: ForegroundTaskOptions(
-        // The service's minute tick: heartbeat, upload, the 16 h cap.
-        eventAction: ForegroundTaskEventAction.repeat(60 * 1000),
-        autoRunOnBoot: true,
-        autoRunOnMyPackageReplaced: true,
-        allowWakeLock: true,
-        allowAutoRestart: true,
-        stopWithTask: false,
-      ),
-    );
+    initTrackingForeground();
     _initialized = true;
   }
 
@@ -121,6 +107,7 @@ class ForegroundTrackingService implements TrackingService {
     final current = await TrackingConfig.load();
     if (running && current?.attendanceLogId == state.attendanceLogId) {
       FlutterForegroundTask.sendDataToTask({'command': 'report'});
+      await armTrackingWatchdog();
       return;
     }
 
@@ -137,16 +124,12 @@ class ForegroundTrackingService implements TrackingService {
 
     final result = running
         ? await FlutterForegroundTask.restartService()
-        : await FlutterForegroundTask.startService(
-            serviceId: 4217,
-            serviceTypes: const [ForegroundServiceTypes.location],
-            notificationTitle: 'ATLAS is recording your work location',
-            notificationText: 'Since ${ManilaTime.time(since)}. Stops when you clock out.',
-            callback: startTrackingCallback,
-          );
+        : await startTrackingForeground(since);
     switch (result) {
       case ServiceRequestSuccess():
         _snapshot.value = TrackingSnapshot(running: true, attendanceLogId: state.attendanceLogId);
+        // The watchdog restarts recording if the phone closes it mid-shift.
+        await armTrackingWatchdog();
       case ServiceRequestFailure(:final error):
         debugPrint('tracking: could not start: $error');
         await TrackingConfig.clear();
@@ -165,6 +148,8 @@ class ForegroundTrackingService implements TrackingService {
   }
 
   Future<void> _stop(String reason) async {
+    await disarmTrackingWatchdog();
+    await TrackingAlerts().clearAll();
     if (!await FlutterForegroundTask.isRunningService) {
       await TrackingConfig.clear();
       _snapshot.value = TrackingSnapshot(running: false, stopReason: reason);
@@ -182,5 +167,17 @@ class ForegroundTrackingService implements TrackingService {
       await FlutterForegroundTask.stopService();
     }
     _snapshot.value = TrackingSnapshot(running: false, stopReason: reason);
+  }
+
+  @override
+  Future<void> flushNow({Duration timeout = const Duration(seconds: 10)}) async {
+    if (!await FlutterForegroundTask.isRunningService) return;
+    FlutterForegroundTask.sendDataToTask({'command': 'flush'});
+    final until = DateTime.now().add(timeout);
+    // The service reports after its upload; wait for an empty queue.
+    await Future<void>.delayed(const Duration(seconds: 2));
+    while (DateTime.now().isBefore(until) && _snapshot.value.queued > 0) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
   }
 }

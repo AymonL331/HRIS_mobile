@@ -286,12 +286,13 @@ void main() {
     }
   });
 
-  testWidgets('with location done, notifications then battery are asked, and battery can be skipped', (tester) async {
+  testWidgets('with location done, notifications then battery are asked, and neither can be skipped', (tester) async {
     final device = ScriptedDevice(notifications: false, battery: false);
     await tester.pumpWidget(await harness(ScriptedGate(GateVerdict.ok), device));
     await tester.pumpAndSettle();
 
     expect(find.text('Allow notifications'), findsOneWidget);
+    expect(find.text('Skip for now'), findsNothing);
     await tapText(tester, 'Continue');
     expect(device.notificationRequests, 1);
 
@@ -299,18 +300,17 @@ void main() {
     expect(find.text('PHONE SETUP · STEP 5 OF 5'), findsOneWidget);
     await tapText(tester, 'Continue');
     expect(device.batteryRequests, 1);
-    // Still unrestricted = false (some ROMs never grant it): the way past is a
-    // deliberate skip, which is remembered.
-    await tapText(tester, 'Skip for now');
-    expect(device.skipped, contains('battery'));
-    expect(find.text('THE APP'), findsOneWidget);
+    // Still not granted: required since 2026-11-13 — no way past it.
+    expect(find.text('Skip for now'), findsNothing);
+    expect(find.text('THE APP'), findsNothing);
   });
 
-  testWidgets('a step skipped earlier is not asked again', (tester) async {
+  testWidgets('a step skipped on an older version is asked again', (tester) async {
     final device = ScriptedDevice(battery: false, skipped: {'battery'});
     await tester.pumpWidget(await harness(ScriptedGate(GateVerdict.ok), device));
     await tester.pumpAndSettle();
-    expect(find.text('THE APP'), findsOneWidget);
+    expect(find.text('Let ATLAS run in the background'), findsOneWidget);
+    expect(find.text('THE APP'), findsNothing);
   });
 
   testWidgets('a Xiaomi phone gets the brand-specific hint and an App settings button', (tester) async {

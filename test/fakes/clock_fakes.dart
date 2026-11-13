@@ -186,6 +186,11 @@ class FakeTrackingService implements TrackingService {
 
   @override
   Future<void> stop({String reason = 'clocked_out'}) async => stops.add(reason);
+
+  int flushes = 0;
+
+  @override
+  Future<void> flushNow({Duration timeout = const Duration(seconds: 10)}) async => flushes += 1;
 }
 
 Map<String, dynamic> trackingJson({bool active = true, int? attendanceLogId = 1}) => {

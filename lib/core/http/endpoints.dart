@@ -35,6 +35,9 @@ abstract final class Endpoints {
   /// the tracking service recorded between clock-in and clock-out, including the
   /// ones queued offline. Mobile-token only.
   static const trackingPings = '/api/me/tracking/pings';
+  // Long gaps need the employee's reason before clock-out (migration 119).
+  static const trackingGaps = '/api/me/tracking/gaps';
+  static const trackingGapReasons = '/api/me/tracking/gap-reasons';
 
   /// FACE SELF-ENROLLMENT (server migration 061): where I stand (HR's one-time
   /// pass / waiting for review / refused), a liveness challenge issued only while

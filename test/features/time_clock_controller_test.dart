@@ -106,4 +106,73 @@ void main() {
     expect(c.range.within, isTrue);
     expect(c.range.distanceM, lessThan(30));
   });
+
+  // 2026-11-13 — the tracking fix: settings re-checked at every clock-in, and
+  // long gaps explained before clock-out.
+  test('clock-in: a setting recording needs is off -> refused on the phone with what to fix; nothing sent', () async {
+    final checked = <int>[];
+    c = TimeClockController(api: api, fixes: fixes, clockInCheck: () async {
+      checked.add(1);
+      return 'Set ATLAS battery use to "Unrestricted".';
+    });
+    await c.load();
+    await c.punch('in', capture: face.call);
+    expect(checked, [1]);
+    expect(api.punches, isEmpty);
+    expect(fixes.acquired, 0);
+    expect(face.calls, isEmpty);
+    expect(c.outcome, isA<PunchNeedsSetup>().having((o) => o.message, 'message', contains('Unrestricted')));
+    expect(c.phase, ClockPhase.idle);
+  });
+
+  test('clock-in: everything ready -> the punch goes through', () async {
+    c = TimeClockController(api: api, fixes: fixes, clockInCheck: () async => null);
+    await c.load();
+    await c.punch('in', capture: face.call);
+    expect(api.punches, hasLength(1));
+    expect(c.outcome, isA<PunchSuccess>());
+  });
+
+  test('clock-out of a recorded shift asks about gaps first; Cancel sends nothing', () async {
+    final asked = <int>[];
+    var answer = false;
+    c = TimeClockController(api: api, fixes: fixes, beforeClockOut: (id) async {
+      asked.add(id);
+      return answer;
+    });
+    api.status_ = statusJson(today: clockedIn(), tracking: trackingJson(attendanceLogId: 77));
+    await c.load();
+    await c.punch('out', capture: face.call);
+    expect(asked, [77]);
+    expect(api.punches, isEmpty);
+    expect(c.outcome, isNull);
+
+    answer = true;
+    await c.punch('out', capture: face.call);
+    expect(asked, [77, 77]);
+    expect(api.punches, hasLength(1));
+    expect(api.punches.single['direction'], 'out');
+  });
+
+  test('the clock-in check is not run for a clock-out, nor the gap question for a clock-in', () async {
+    var checks = 0;
+    var asks = 0;
+    c = TimeClockController(
+      api: api,
+      fixes: fixes,
+      clockInCheck: () async {
+        checks += 1;
+        return null;
+      },
+      beforeClockOut: (_) async {
+        asks += 1;
+        return true;
+      },
+    );
+    api.status_ = statusJson(tracking: trackingJson(active: false, attendanceLogId: null));
+    await c.load();
+    await c.punch('in', capture: face.call);
+    expect(checks, 1);
+    expect(asks, 0);
+  });
 }

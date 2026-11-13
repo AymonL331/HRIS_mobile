@@ -32,19 +32,18 @@ void main() {
     expect(next(GateVerdict.ok), isNull);
   });
 
-  test('a skipped optional step is not asked again; location cannot be skipped', () {
-    expect(next(GateVerdict.ok, notif: false, skipped: {'notifications'}), isNull);
-    expect(next(GateVerdict.ok, notif: false, battery: false, skipped: {'notifications'}), SetupStep.battery);
-    expect(next(GateVerdict.ok, battery: false, skipped: {'battery'}), isNull);
-    // Skipping names for location steps are ignored.
+  test('nothing can be skipped (2026-11-13): an old "Skip for now" is ignored', () {
+    expect(next(GateVerdict.ok, notif: false, skipped: {'notifications'}), SetupStep.notifications);
+    expect(next(GateVerdict.ok, notif: false, battery: false, skipped: {'notifications'}), SetupStep.notifications);
+    expect(next(GateVerdict.ok, battery: false, skipped: {'battery'}), SetupStep.battery);
     expect(next(GateVerdict.backgroundDenied, skipped: {'allowAllTheTime', 'locationPermission'}), SetupStep.allowAllTheTime);
   });
 
-  test('step numbering is 1-based over five steps', () {
+  test('step numbering is 1-based over five steps; none is skippable', () {
     expect(SetupStep.total, 5);
     expect(SetupStep.locationService.number, 1);
     expect(SetupStep.battery.number, 5);
-    expect(SetupStep.values.where((s) => s.skippable), [SetupStep.notifications, SetupStep.battery]);
+    expect(SetupStep.values.where((s) => s.skippable), isEmpty);
   });
 
   test('brand hints match loosely and stay silent for stock Android', () {
@@ -55,6 +54,10 @@ void main() {
     expect(oemBatteryHint('samsung')!.brand, 'Samsung');
     expect(oemBatteryHint('INFINIX MOBILITY LIMITED'), isNotNull);
     expect(oemBatteryHint('Google'), isNull);
+    // Every brand guide ends with locking ATLAS in recent apps (2026-11-13).
+    for (final b in ['Xiaomi', 'OPPO', 'vivo', 'HUAWEI', 'Infinix']) {
+      expect(oemBatteryHint(b)!.steps.any((s) => s.startsWith('Lock ATLAS')), isTrue, reason: b);
+    }
     expect(oemBatteryHint(''), isNull);
   });
 }

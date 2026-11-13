@@ -112,6 +112,16 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        <!-- PHONE TURNED OFF (migration 119): notes the boot time so a shift's gap
+             can say the phone was off. Writes one SharedPreferences value. -->
+        <receiver
+            android:name=".BootMarkReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
         <!-- IN-APP UPDATE: shares ONLY the downloaded update (cache/updates/) with
              Android's installer — see res/xml/update_file_paths.xml. -->
         <provider

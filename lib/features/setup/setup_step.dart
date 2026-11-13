@@ -24,10 +24,12 @@ enum SetupStep {
 
   static int get total => values.length;
 
-  /// Location is mandatory — the app does not run without it. These two make
-  /// work-hours tracking reliable but some phones cannot grant them, so the
-  /// employee may deliberately skip them (remembered).
-  bool get skippable => this == notifications || this == battery;
+  /// Nothing is skippable since 2026-11-13 (user: shifts showed hours with no
+  /// location because phones closed ATLAS). Notifications carry the "fix this"
+  /// alerts and the recording notice; the battery exemption is what keeps the
+  /// phone from closing ATLAS in the background. A "Skip for now" chosen on an
+  /// older version is ignored.
+  bool get skippable => false;
 }
 
 /// The one decision, pure so it reads (and tests) as a truth table: which step
@@ -53,11 +55,7 @@ SetupStep? nextSetupStep({
     case GateVerdict.ok:
       break;
   }
-  if (!device.notificationsGranted && !skipped.contains(SetupStep.notifications.name)) {
-    return SetupStep.notifications;
-  }
-  if (!device.batteryUnrestricted && !skipped.contains(SetupStep.battery.name)) {
-    return SetupStep.battery;
-  }
+  if (!device.notificationsGranted) return SetupStep.notifications;
+  if (!device.batteryUnrestricted) return SetupStep.battery;
   return null;
 }

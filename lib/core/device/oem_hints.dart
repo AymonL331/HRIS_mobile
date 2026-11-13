@@ -32,18 +32,21 @@ OemHint? oemBatteryHint(String manufacturer) {
     return const OemHint('Xiaomi / Redmi / POCO', [
       'Autostart: turn it ON.',
       'Battery saver: choose "No restrictions".',
+      'Lock ATLAS in the recent-apps screen (open recent apps, press and hold ATLAS or pull it down, tap the lock) so "Clear all" does not close it.',
     ], onAppInfoPage: true);
   }
   if (any(const ['oppo', 'realme', 'oneplus'])) {
     return const OemHint('OPPO / realme / OnePlus', [
       'Battery usage: turn ON "Allow background activity".',
       'Also turn ON "Allow auto launch" if you see it.',
+      'Lock ATLAS in the recent-apps screen (open recent apps, press and hold ATLAS or pull it down, tap the lock) so "Clear all" does not close it.',
     ], onAppInfoPage: true);
   }
   if (any(const ['vivo', 'iqoo'])) {
     return const OemHint('vivo', [
       'Battery › Background power consumption: allow ATLAS.',
       'Also turn ON Auto-start for ATLAS if you see it (i Manager › App manager).',
+      'Lock ATLAS in the recent-apps screen (open recent apps, press and hold ATLAS or pull it down, tap the lock) so "Clear all" does not close it.',
     ]);
   }
   if (any(const ['samsung'])) {
@@ -56,12 +59,13 @@ OemHint? oemBatteryHint(String manufacturer) {
     return const OemHint('HUAWEI / HONOR', [
       'Battery › App launch › ATLAS: turn OFF "Manage automatically".',
       'Then turn ON Auto-launch, Secondary launch and Run in background.',
+      'Lock ATLAS in the recent-apps screen (open recent apps, press and hold ATLAS or pull it down, tap the lock) so "Clear all" does not close it.',
     ]);
   }
   if (any(const ['infinix', 'tecno', 'itel'])) {
     return const OemHint('Infinix / TECNO / itel', [
       'Phone Master (or Settings › App management) › Auto-start: allow ATLAS.',
-      'Lock ATLAS in the recent-apps screen so it is not cleared.',
+      'Lock ATLAS in the recent-apps screen (open recent apps, press and hold ATLAS or pull it down, tap the lock) so "Clear all" does not close it.',
     ]);
   }
   return null;

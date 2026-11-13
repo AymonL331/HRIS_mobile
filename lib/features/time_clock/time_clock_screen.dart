@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/session_controller.dart';
+import '../../core/device/device_readiness_service.dart';
 import '../../core/time/manila_time.dart';
 import '../../shared/button_styles.dart';
 import '../../shared/tokens.dart';
@@ -755,6 +756,27 @@ class _OutcomeCard extends StatelessWidget {
             OutlinedButton(
               onPressed: onConsent,
               child: const Text('Review and give consent'),
+            ),
+          ],
+        );
+      // A setting recording needs is off (2026-11-13). "Fix it" opens ATLAS's
+      // page in the phone's Settings; coming back re-runs the setup check.
+      case PunchNeedsSetup(:final message):
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            MessageBanner.warning('$message Your clock-in was not sent.'),
+            const SizedBox(height: HrisSpace.s2),
+            FilledButton.icon(
+              onPressed: () {
+                try {
+                  context.read<DeviceReadinessService>().openAppSettings();
+                } on ProviderNotFoundException {
+                  // No settings service (a test): nothing to open.
+                }
+              },
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('Fix it'),
             ),
           ],
         );
