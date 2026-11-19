@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hris_mobile/core/http/api_exception.dart';
 import 'package:hris_mobile/core/location/location_fix.dart';
 import 'package:hris_mobile/features/time_clock/time_clock_controller.dart';
+import 'package:hris_mobile/features/tracking/phone_setup.dart';
 
 import '../fakes/clock_fakes.dart';
 
@@ -113,7 +114,7 @@ void main() {
     final checked = <int>[];
     c = TimeClockController(api: api, fixes: fixes, clockInCheck: () async {
       checked.add(1);
-      return 'Set ATLAS battery use to "Unrestricted".';
+      return const SetupProblem('Set ATLAS battery use to "Unrestricted".', SetupFix.batteryExemption);
     });
     await c.load();
     await c.punch('in', capture: face.call);
@@ -122,6 +123,7 @@ void main() {
     expect(fixes.acquired, 0);
     expect(face.calls, isEmpty);
     expect(c.outcome, isA<PunchNeedsSetup>().having((o) => o.message, 'message', contains('Unrestricted')));
+    expect((c.outcome as PunchNeedsSetup).problem.fix, SetupFix.batteryExemption);
     expect(c.phase, ClockPhase.idle);
   });
 

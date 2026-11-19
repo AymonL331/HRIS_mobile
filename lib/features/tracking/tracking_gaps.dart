@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/session_controller.dart';
-import '../../core/device/device_readiness_service.dart';
 import '../../core/http/endpoints.dart';
-import '../../core/location/location_gate_service.dart';
 import '../../core/time/manila_time.dart';
 import 'tracking_service.dart';
 
@@ -173,38 +171,4 @@ class _GapReasonsDialogState extends State<GapReasonsDialog> {
       ],
     );
   }
-}
-
-/// THE CLOCK-IN CHECK (step 2, 2026-11-13): everything recording needs, read
-/// again at every clock-in. Null = ready; otherwise what to fix, in plain words.
-Future<String?> trackingReadinessProblem({
-  required LocationGateService gate,
-  required DeviceReadinessService device,
-}) async {
-  final GateVerdict verdict;
-  final DeviceReadiness d;
-  try {
-    verdict = await gate.check();
-    d = await device.check();
-  } catch (_) {
-    return null; // unreadable: never block a clock-in on a check that failed
-  }
-  switch (verdict) {
-    case GateVerdict.serviceOff:
-      return 'Location is turned off. Turn it on, then clock in.';
-    case GateVerdict.permissionDenied:
-    case GateVerdict.permissionDeniedForever:
-      return 'ATLAS is not allowed to use your location. Allow it, then clock in.';
-    case GateVerdict.backgroundDenied:
-      return 'Location must be set to "Allow all the time" so your shift is recorded.';
-    case GateVerdict.reducedAccuracy:
-      return 'Turn on "Use precise location" for ATLAS, then clock in.';
-    case GateVerdict.ok:
-      break;
-  }
-  if (!d.notificationsGranted) return 'Allow ATLAS notifications so it can tell you when recording stops.';
-  if (!d.batteryUnrestricted) {
-    return 'Set ATLAS battery use to "Unrestricted" (no battery saving) so your phone does not close it during your shift.';
-  }
-  return null;
 }

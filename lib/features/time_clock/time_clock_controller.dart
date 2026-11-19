@@ -8,6 +8,7 @@ import '../../core/time/server_clock.dart';
 import '../face/face_capture_screen.dart';
 import '../face/face_models.dart';
 import '../reminders/reminder_coordinator.dart';
+import '../tracking/phone_setup.dart';
 import '../tracking/tracking_models.dart';
 import '../tracking/tracking_service.dart';
 import 'clock_api.dart';
@@ -58,12 +59,14 @@ class PunchNeedsConsent extends PunchOutcome {
 /// off (location "all the time", precise, notifications, battery). The screen
 /// offers a "Fix it" button (2026-11-13).
 class PunchNeedsSetup extends PunchOutcome {
-  final String message;
-  const PunchNeedsSetup(this.message);
+  final SetupProblem problem;
+  const PunchNeedsSetup(this.problem);
+
+  String get message => problem.message;
 }
 
-/// The clock-in check: null = ready, otherwise what to fix.
-typedef ClockInCheck = Future<String?> Function();
+/// The clock-in check: null = ready, otherwise what to fix and where.
+typedef ClockInCheck = Future<SetupProblem?> Function();
 
 /// Runs before a clock-out with the open shift's id; false = the employee
 /// cancelled (e.g. the "explain your gaps" dialog).

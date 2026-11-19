@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/session_controller.dart';
 import '../../core/device/device_readiness_service.dart';
+import '../../core/device/phone_state_service.dart';
 import '../../core/location/location_fix.dart';
 import '../../core/location/location_gate_service.dart';
 import '../../shared/tokens.dart';
@@ -28,6 +31,7 @@ import '../settings/settings_screen.dart';
 import '../time_clock/clock_api.dart';
 import '../time_clock/time_clock_controller.dart';
 import '../time_clock/time_clock_screen.dart';
+import '../tracking/phone_setup.dart';
 import '../tracking/tracking_gaps.dart';
 import '../tracking/tracking_service.dart';
 import '../travel_orders/travel_order_api.dart';
@@ -69,13 +73,31 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
   ReminderTapRelay? _taps;
+
+  /// Sends the phone's settings to HR (server migration 125): now, on every
+  /// return to the screen, and at each clock-in. Null without an employee or in
+  /// a test without the location/settings services.
+  PhoneSettingsReporter? _phoneReporter;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    final session = context.read<SessionController>();
+    final gate = _optional<LocationGateService>(context);
+    final device = _optional<DeviceReadinessService>(context);
+    if (session.user?.employeeId != null && gate != null && device != null) {
+      _phoneReporter = PhoneSettingsReporter(
+        api: _optional<PhoneSettingsApi?>(context) ?? MobilePhoneSettingsApi(session),
+        gate: gate,
+        device: device,
+        phone: _optional<PhoneStateService>(context),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) => _phoneReporter?.report());
+    }
     // A tapped reminder notification opens the Time Clock (user decision
     // 2026-09-17) — whether the tap launched the app (the relay already holds
     // it) or landed while any page was showing.
@@ -86,8 +108,16 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _taps?.removeListener(_onReminderTap);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Back from the settings page the employee was just sent to, or a setting
+    // changed while away: the newest state goes to HR.
+    if (state == AppLifecycleState.resumed) _phoneReporter?.report();
   }
 
   void _onReminderTap() {
@@ -188,6 +218,7 @@ class _HomeShellState extends State<HomeShell> {
             final tracking = _trackingOf(ctx);
             final gate = _optional<LocationGateService>(ctx);
             final device = _optional<DeviceReadinessService>(ctx);
+            final phone = _optional<PhoneStateService>(ctx);
             return TimeClockController(
               api: ctx.read<ClockApi?>() ?? MobileClockApi(ctx.read<SessionController>()),
               fixes: ctx.read<LocationFixService>(),
@@ -197,7 +228,13 @@ class _HomeShellState extends State<HomeShell> {
               // at every clock-in; long gaps explained before clock-out.
               clockInCheck: gate == null || device == null
                   ? null
-                  : () => trackingReadinessProblem(gate: gate, device: device),
+                  : () async {
+                      final problem = await trackingReadinessProblem(gate: gate, device: device, phone: phone);
+                      // What the phone looked like at this clock-in, for HR —
+                      // sent whether or not the clock-in goes through.
+                      unawaited(_phoneReporter?.report(force: true));
+                      return problem;
+                    },
               beforeClockOut: tracking == null
                   ? null
                   : (id) => explainGapsBeforeClockOut(

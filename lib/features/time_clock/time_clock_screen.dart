@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/session_controller.dart';
 import '../../core/device/device_readiness_service.dart';
+import '../../core/device/phone_state_service.dart';
+import '../../core/location/location_gate_service.dart';
 import '../../core/time/manila_time.dart';
 import '../../shared/button_styles.dart';
 import '../../shared/tokens.dart';
@@ -19,6 +21,7 @@ import '../face_enrollment/face_enrollment_api.dart';
 import '../face_enrollment/face_enrollment_models.dart';
 import '../face_enrollment/face_enrollment_screen.dart';
 import '../tracking/battery_warning_card.dart';
+import '../tracking/phone_setup.dart';
 import '../tracking/tracking_service.dart';
 import '../tracking/tracking_status_card.dart';
 import 'clock_models.dart';
@@ -759,25 +762,41 @@ class _OutcomeCard extends StatelessWidget {
             ),
           ],
         );
-      // A setting recording needs is off (2026-11-13). "Fix it" opens ATLAS's
-      // page in the phone's Settings; coming back re-runs the setup check.
-      case PunchNeedsSetup(:final message):
+      // A setting recording needs is off (2026-11-13). "Fix it" opens the exact
+      // page or dialog for THAT switch (2026-11-19); the next clock-in re-checks.
+      case PunchNeedsSetup(:final problem):
+        T? opt<T>() {
+          try {
+            return context.read<T>();
+          } on ProviderNotFoundException {
+            return null; // a test without that service: nothing to open
+          }
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            MessageBanner.warning('$message Your clock-in was not sent.'),
+            MessageBanner.warning('${problem.message} Your clock-in was not sent.'),
             const SizedBox(height: HrisSpace.s2),
             FilledButton.icon(
-              onPressed: () {
-                try {
-                  context.read<DeviceReadinessService>().openAppSettings();
-                } on ProviderNotFoundException {
-                  // No settings service (a test): nothing to open.
-                }
-              },
+              onPressed: () => applySetupFix(
+                problem.fix,
+                gate: opt<LocationGateService>(),
+                device: opt<DeviceReadinessService>(),
+                phone: opt<PhoneStateService>(),
+              ),
               icon: const Icon(Icons.settings_outlined),
               label: const Text('Fix it'),
             ),
+            // The maker's own Autostart switch: no API reports it, so it is
+            // offered, never checked.
+            if (problem.offerAutostart && opt<PhoneStateService>() != null) ...[
+              const SizedBox(height: HrisSpace.s1),
+              TextButton.icon(
+                onPressed: () => opt<PhoneStateService>()?.openAutostart(),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Also turn on Autostart for ATLAS'),
+              ),
+            ],
           ],
         );
     }

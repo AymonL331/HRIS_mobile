@@ -11,6 +11,7 @@ import 'core/auth/session_controller.dart';
 import 'core/auth/session_store.dart';
 import 'core/config/env_store.dart';
 import 'core/device/device_readiness_service.dart';
+import 'core/device/phone_state_service.dart';
 import 'core/location/location_fix.dart';
 import 'core/location/location_gate_service.dart';
 import 'features/app_update/app_update_api.dart';
@@ -107,6 +108,7 @@ Future<void> main() async {
         Provider<LocationGateService>.value(value: GeolocatorGateService()),
         // Notifications + battery exemption, the setup wizard's optional steps.
         Provider<DeviceReadinessService>.value(value: PlatformReadinessService()),
+        Provider<PhoneStateService>.value(value: const PlatformPhoneStateService()),
         Provider<TrackingService>.value(value: tracking),
         Provider<LocationFixService>.value(value: const GeolocatorFixService()),
         // The Time Clock's API is built from the session by the shell; tests

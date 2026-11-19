@@ -1,10 +1,14 @@
 package com.suertemotoplaza.hris
 
+import android.app.ActivityManager
 import android.app.AlarmManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.provider.Settings
@@ -87,6 +91,44 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        // PHONE SETTINGS THAT CAN STOP RECORDING (2026-11-19): read them, and open
+        // the exact page that changes each. Every read is guarded: a phone that
+        // refuses one answers null ("could not tell"), never an error.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "hris/phone_state").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "read" -> {
+                    val m = HashMap<String, Any?>()
+                    val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    m["powerSaveOn"] = guard { power.isPowerSaveMode }
+                    m["locationPowerSaveMode"] =
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) guard { power.locationPowerSaveMode } else null
+                    m["backgroundRestricted"] = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        guard { (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).isBackgroundRestricted }
+                    } else null
+                    m["dataSaverOn"] = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        guard {
+                            (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).restrictBackgroundStatus ==
+                                ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
+                        }
+                    } else null
+                    m["model"] = Build.MODEL
+                    m["osVersion"] = Build.VERSION.RELEASE
+                    result.success(m)
+                }
+                "openBatterySaver" -> result.success(
+                    tryStart(Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)) || tryStart(appDetails())
+                )
+                "openDataSaver" -> result.success(
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
+                        tryStart(Intent(Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS, Uri.parse("package:$packageName")))) ||
+                        tryStart(appDetails())
+                )
+                "openAutostart" -> result.success(AUTOSTART_PAGES.any { (pkg, cls) ->
+                    tryStart(Intent().setComponent(ComponentName(pkg, cls)))
+                })
+                else -> result.notImplemented()
+            }
+        }
         // CLOCK REMINDERS (2026-09-18): may this app set EXACT alarms right now?
         // Asked of AlarmManager itself, because a permission plugin reads it off
         // the manifest's SCHEDULE_EXACT_ALARM entry — which this app declares for
@@ -101,5 +143,37 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun <T> guard(read: () -> T): T? = try { read() } catch (e: Exception) { null }
+
+    private fun appDetails() = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+
+    /** Start a settings page; false when this phone has no such page or refuses it. */
+    private fun tryStart(intent: Intent): Boolean = try {
+        startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    } catch (e: Exception) {
+        false
+    }
+
+    companion object {
+        /** The makers' own Autostart / app-launch pages, tried in order. Names
+         *  move between skin versions, so several per maker; the first that
+         *  opens wins. No API reports these switches. */
+        private val AUTOSTART_PAGES = listOf(
+            "com.miui.securitycenter" to "com.miui.permcenter.autostart.AutoStartManagementActivity",
+            "com.coloros.safecenter" to "com.coloros.safecenter.permission.startup.StartupAppListActivity",
+            "com.coloros.safecenter" to "com.coloros.safecenter.startupapp.StartupAppListActivity",
+            "com.oplus.safecenter" to "com.oplus.safecenter.permission.startup.StartupAppListActivity",
+            "com.oppo.safe" to "com.oppo.safe.permission.startup.StartupAppListActivity",
+            "com.vivo.permissionmanager" to "com.vivo.permissionmanager.activity.BgStartUpManagerActivity",
+            "com.iqoo.secure" to "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity",
+            "com.huawei.systemmanager" to "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity",
+            "com.huawei.systemmanager" to "com.huawei.systemmanager.optimize.process.ProtectActivity",
+            "com.hihonor.systemmanager" to "com.hihonor.systemmanager.startupmgr.ui.StartupNormalAppListActivity",
+            "com.transsion.phonemaster" to "com.cyin.himgr.autostart.AutoStartActivity",
+            "com.samsung.android.lool" to "com.samsung.android.sm.battery.ui.BatteryActivity",
+        )
     }
 }
