@@ -15,6 +15,8 @@ abstract final class Endpoints {
 
   static const mobileClockStatus = '/api/me/mobile-clock/status';
   static const mobileClock = '/api/me/mobile-clock';
+  /// Why I was late / left early (server migration 128).
+  static String attendanceReason(int attendanceLogId) => '/api/me/attendance/$attendanceLogId/reason';
 
   /// The liveness challenge a punch must answer. Shared with the WEB field
   /// clock — a challenge is surface-agnostic (it issues a nonce and an ordered

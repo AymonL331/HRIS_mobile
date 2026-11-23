@@ -174,4 +174,52 @@ void main() {
     expect(find.byTooltip('Check my range'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
+
+  // Migration 128: a late Time In asks why, and the popup cannot be closed.
+  testWidgets('a late Time In asks why; it stays open until the reason is sent', (tester) async {
+    final api = FakeClockApi()
+      ..nextPending = [
+        {'kind': 'late', 'minutes': 25, 'attendance_log_id': 1},
+      ];
+    await mount(tester, api, FakeFixService());
+    await tester.tap(find.widgetWithText(FilledButton, 'Time In'));
+    await settle(tester);
+    expect(find.text('You clocked in late'), findsOneWidget);
+    expect(find.textContaining('25m late today'), findsOneWidget);
+    // Back / tap outside do nothing.
+    await tester.tapAt(const Offset(5, 5));
+    await settle(tester);
+    expect(find.text('You clocked in late'), findsOneWidget);
+    // Send stays off until something is typed.
+    final send = find.byKey(const Key('late_reason_send'));
+    expect(tester.widget<FilledButton>(send).onPressed, isNull);
+    await tester.enterText(find.byKey(const Key('late_reason_field')), '  Flat   tire on the way ');
+    await tester.pump();
+    await tester.tap(send);
+    await settle(tester);
+    await tester.pump(const Duration(milliseconds: 400)); // the dialog's close animation
+    expect(api.reasons.single, {'attendance_log_id': 1, 'kind': 'late', 'reason': 'Flat tire on the way'});
+    expect(find.text('You clocked in late'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a send that fails keeps the popup open with the message', (tester) async {
+    final api = FakeClockApi()
+      ..nextPending = [
+        {'kind': 'undertime', 'minutes': 60, 'attendance_log_id': 1},
+      ]
+      ..reasonError = const ApiException(status: 422, message: 'Validation failed.', fieldErrors: {'reason': 'Please type your reason.'});
+    await mount(tester, api, FakeFixService());
+    await tester.tap(find.widgetWithText(FilledButton, 'Time In'));
+    await settle(tester);
+    expect(find.text('You clocked out early'), findsOneWidget);
+    expect(find.textContaining('leaving 1h 0m before'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('late_reason_field')), 'Doctor visit');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('late_reason_send')));
+    await settle(tester);
+    expect(find.text('Please type your reason.'), findsOneWidget);
+    expect(find.text('You clocked out early'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

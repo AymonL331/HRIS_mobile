@@ -129,6 +129,9 @@ class _StubClock implements ClockApi {
       throw UnimplementedError();
   @override
   Future<void> grantConsent() async {}
+
+  @override
+  Future<void> submitReason({required int attendanceLogId, required String kind, required String reason}) async {}
 }
 
 class _AlwaysOk implements LocationGateService {

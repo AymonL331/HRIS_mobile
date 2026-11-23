@@ -120,6 +120,31 @@ class TimeClockController extends ChangeNotifier {
   ClockStatus? get status => _status;
   ClockPhase get phase => _phase;
   PunchOutcome? get outcome => _outcome;
+
+  // LATE / UNDERTIME REASONS (server migration 128): what still has to be
+  // explained — from the punch reply and from today's row, so a popup closed by
+  // killing the app asks again on the next open. Late first, each once.
+  final Set<String> _answered = <String>{};
+  List<PendingReason> get pendingReasons {
+    final seen = <String>{};
+    final out = <PendingReason>[];
+    void add(List<PendingReason> list) {
+      for (final p in list) {
+        if (!_answered.contains(p.key) && seen.add(p.key)) out.add(p);
+      }
+    }
+    final o = _outcome;
+    if (o is PunchSuccess) add(o.response.pendingReasons);
+    add(_status?.today?.pendingReasons ?? const []);
+    return [...out.where((p) => p.kind == 'late'), ...out.where((p) => p.kind != 'late')];
+  }
+
+  /// Send one reason. Throws the ApiException so the popup can show it and stay open.
+  Future<void> submitReason(PendingReason p, String reason) async {
+    await api.submitReason(attendanceLogId: p.attendanceLogId, kind: p.kind, reason: reason);
+    _answered.add(p.key);
+    _notify();
+  }
   LocationFix? get lastFix => _lastFix;
   bool get rangeChecking => _rangeChecking;
   bool get consentSaving => _consentSaving;

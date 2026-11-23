@@ -92,6 +92,10 @@ class FakeClockApi implements ClockApi {
   final challenges = <String>[];
   int consents = 0;
   int statusCalls = 0;
+  /// The punch reply's pending_reasons (migration 128), e.g. a late Time In.
+  List<Map<String, dynamic>> nextPending = const [];
+  final reasons = <Map<String, dynamic>>[];
+  Object? reasonError;
 
   @override
   Future<ClockStatus> status() async {
@@ -122,6 +126,7 @@ class FakeClockApi implements ClockApi {
       'clock_in_at': '2026-09-11T00:13:00.000Z',
       'clock_out_at': null,
       'attendance_log_id': 1,
+      'pending_reasons': nextPending,
       'server_time': '2026-09-11T00:13:00.500Z',
       'match_distance': 0.31,
       'location': travelOrderPunch
@@ -143,6 +148,12 @@ class FakeClockApi implements ClockApi {
   Future<void> grantConsent() async {
     consents++;
     status_ = statusJson();
+  }
+
+  @override
+  Future<void> submitReason({required int attendanceLogId, required String kind, required String reason}) async {
+    if (reasonError != null) throw reasonError!;
+    reasons.add({'attendance_log_id': attendanceLogId, 'kind': kind, 'reason': reason});
   }
 }
 

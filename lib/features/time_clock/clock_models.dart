@@ -54,6 +54,32 @@ class Worksite {
   }
 }
 
+/// A late Time In / an early Time Out not yet explained (server migration 128):
+/// the Time Clock asks why, and the popup cannot be closed until it is sent.
+class PendingReason {
+  final String kind; // 'late' | 'undertime'
+  final int minutes;
+  final int attendanceLogId;
+
+  const PendingReason({required this.kind, required this.minutes, required this.attendanceLogId});
+
+  String get key => '$attendanceLogId:$kind';
+
+  static List<PendingReason> listFrom(Object? v) {
+    if (v is! List) return const [];
+    final out = <PendingReason>[];
+    for (final e in v) {
+      if (e is! Map) continue;
+      final kind = e['kind'];
+      final id = _int(e['attendance_log_id']);
+      if ((kind == 'late' || kind == 'undertime') && id != null && id > 0) {
+        out.add(PendingReason(kind: kind as String, minutes: _int(e['minutes']) ?? 0, attendanceLogId: id));
+      }
+    }
+    return out;
+  }
+}
+
 class TodayPunches {
   final int attendanceLogId;
   final DateTime? clockInAt;
@@ -61,6 +87,7 @@ class TodayPunches {
   final String? status;
   final String? clockInMethod;
   final String? clockOutMethod;
+  final List<PendingReason> pendingReasons;
 
   const TodayPunches({
     required this.attendanceLogId,
@@ -69,6 +96,7 @@ class TodayPunches {
     required this.status,
     required this.clockInMethod,
     required this.clockOutMethod,
+    this.pendingReasons = const [],
   });
 
   factory TodayPunches.fromJson(Map<String, dynamic> j) => TodayPunches(
@@ -78,6 +106,7 @@ class TodayPunches {
         status: j['status'] as String?,
         clockInMethod: j['clock_in_method'] as String?,
         clockOutMethod: j['clock_out_method'] as String?,
+        pendingReasons: PendingReason.listFrom(j['pending_reasons']),
       );
 }
 
@@ -225,6 +254,9 @@ class PunchResponse {
   /// judge it (2026-11-11).
   final bool travelOrder;
 
+  /// Late / early, not yet explained (migration 128): the popup asks why.
+  final List<PendingReason> pendingReasons;
+
   const PunchResponse({
     required this.direction,
     required this.clockInAt,
@@ -237,6 +269,7 @@ class PunchResponse {
     required this.radiusM,
     required this.matchDistance,
     this.travelOrder = false,
+    this.pendingReasons = const [],
   });
 
   bool get faceVerified => matchDistance != null;
@@ -258,6 +291,7 @@ class PunchResponse {
       radiusM: _int(ws?['radius_m']),
       matchDistance: _num(j['match_distance']),
       travelOrder: loc?['travel_order'] == true,
+      pendingReasons: PendingReason.listFrom(j['pending_reasons']),
     );
   }
 }

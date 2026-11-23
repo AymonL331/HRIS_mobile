@@ -25,6 +25,7 @@ import '../tracking/phone_setup.dart';
 import '../tracking/tracking_service.dart';
 import '../tracking/tracking_status_card.dart';
 import 'clock_models.dart';
+import 'late_reason_dialog.dart';
 import 'time_clock_controller.dart';
 
 /// How often the Time Clock re-reads itself while HR can still change what it offers
@@ -96,6 +97,26 @@ class _TimeClockScreenState extends State<TimeClockScreen>
     super.dispose();
   }
 
+  // LATE / UNDERTIME REASONS (server migration 128): one popup at a time, late
+  // first; each must be answered before the next (and before the clock is usable).
+  bool _askingReason = false;
+  Future<void> _askReasons() async {
+    if (_askingReason || !mounted) return;
+    _askingReason = true;
+    try {
+      while (true) {
+        if (!mounted) break;
+        final c = context.read<TimeClockController>();
+        final list = c.pendingReasons;
+        if (list.isEmpty) break;
+        final p = list.first;
+        await showLateReasonDialog(context, pending: p, onSend: (reason) => c.submitReason(p, reason));
+      }
+    } finally {
+      _askingReason = false;
+    }
+  }
+
   // Back in the app: re-read the clock. Until 2026-09-15 it only reloaded on first
   // open, after an enrollment or a punch, or on pull-to-refresh — so a pass HR had
   // cancelled kept showing "Enroll my face" until the employee refreshed by hand.
@@ -146,6 +167,10 @@ class _TimeClockScreenState extends State<TimeClockScreen>
   Widget build(BuildContext context) {
     final c = context.watch<TimeClockController>();
     final status = c.status;
+    // A late Time In / an early Time Out not yet explained (migration 128): ask.
+    if (c.pendingReasons.isNotEmpty && !_askingReason) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _askReasons());
+    }
 
     if (status == null && c.loading) {
       return const Center(child: CircularProgressIndicator());

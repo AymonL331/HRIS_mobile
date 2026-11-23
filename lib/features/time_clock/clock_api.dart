@@ -24,6 +24,9 @@ abstract class ClockApi {
   });
 
   Future<void> grantConsent();
+
+  /// Send the reason for a late Time In / an early Time Out (migration 128).
+  Future<void> submitReason({required int attendanceLogId, required String kind, required String reason});
 }
 
 /// The real thing: the mobile-only endpoints, through the session's guard so a
@@ -64,4 +67,11 @@ class MobileClockApi implements ClockApi {
   // The APP's own consent, not the web field clock's — see Endpoints.
   @override
   Future<void> grantConsent() => session.guard(() => session.client.post(Endpoints.mobileLocationConsent));
+
+  @override
+  Future<void> submitReason({required int attendanceLogId, required String kind, required String reason}) =>
+      session.guard(() => session.client.post(
+            Endpoints.attendanceReason(attendanceLogId),
+            body: {'kind': kind, 'reason': reason},
+          ));
 }
