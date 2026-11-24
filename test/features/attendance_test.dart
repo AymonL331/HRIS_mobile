@@ -53,6 +53,10 @@ class FakeAttendanceApi implements AttendanceApi {
   @override
   Future<List<CorrectionRequest>> corrections() async => correctionRows.map(CorrectionRequest.fromJson).toList();
 
+  Map<String, dynamic> biometricJson = const {'enrolled': true, 'model_version': 'arcface-v1', 'consent_given': true};
+  @override
+  Future<BiometricStatus> biometric() async => BiometricStatus.fromJson(biometricJson);
+
   @override
   Future<String> stageProof({required Uint8List bytes, required String mimeType, required String name}) async {
     staged.add('$mimeType $name ${bytes.length}');
@@ -117,13 +121,15 @@ void main() {
     expect(c.error, contains('Cannot reach'));
   });
 
-  testWidgets('the screen renders the month header, badges, chips and times, and never a coordinate', (tester) async {
+  testWidgets('Records is the web page on a phone: face card, the DTR table with its eight columns, never a coordinate', (tester) async {
     final api = FakeAttendanceApi({
       '2026-09': [
-        row('2026-09-11', status: 'late', inAt: '2026-09-11T00:36:24.000Z', outAt: '2026-09-11T09:00:00.000Z', extra: {'is_late': true, 'recorded_late_minutes': 36, 'capture_method': 'mobile'}),
-        row('2026-09-10', dayType: 'absent', status: 'absent', extra: {'worked_minutes': 0, 'capture_method': 'system'}),
+        row('2026-09-11', status: 'late', inAt: '2026-09-11T00:36:24.000Z', outAt: '2026-09-11T09:00:00.000Z',
+            extra: {'is_late': true, 'recorded_late_minutes': 36, 'late_reason': 'Flat tire', 'capture_method': 'mobile'}),
+        row('2026-09-10', dayType: 'absent', status: 'absent', extra: {'worked_minutes': 0}),
         row('2026-09-06', dayType: 'rest_day', status: null, extra: {'worked_minutes': 0}),
-        row('2026-09-04', dayType: 'on_leave', status: null, extra: {'worked_minutes': 0, 'is_on_leave': true, 'leave_type_name': 'Sick Leave', 'leave_day_part': 'am'}),
+        row('2026-09-04', dayType: 'on_leave', status: null,
+            extra: {'worked_minutes': 0, 'is_on_leave': true, 'leave_type_name': 'Sick Leave', 'leave_day_part': 'am_half'}),
         row('2026-09-01', dayType: 'holiday', status: null, extra: {'worked_minutes': 0, 'holiday_title': 'National Heroes Day'}),
       ],
     });
@@ -133,15 +139,22 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('September 2026'), findsOneWidget);
-    expect(find.text('1 worked · 1 late · 1 absent · 1 on leave'), findsOneWidget);
+    expect(find.text('Your daily time record and corrections.'), findsOneWidget);
+    expect(find.text('Face enrollment'), findsOneWidget);
+    expect(find.text('Enrolled'), findsOneWidget);
+    expect(find.text('Daily time record'), findsOneWidget);
+    for (final h in ['DATE', 'CLOCK IN', 'CLOCK OUT', 'WORKED', 'LATE', 'UNDERTIME', 'STATUS', 'METHOD']) {
+      expect(find.text(h), findsOneWidget, reason: h);
+    }
+    expect(find.text('8:36 AM'), findsOneWidget);
+    expect(find.text('5:00 PM'), findsOneWidget);
+    expect(find.text('36m'), findsOneWidget);
+    expect(find.text('Flat tire'), findsOneWidget); // my reason, under the late time
     expect(find.text('Late'), findsOneWidget);
-    expect(find.text('Late 36m'), findsOneWidget);
-    expect(find.text('8:36 AM  →  5:00 PM'), findsOneWidget);
-    expect(find.text('Mobile app'), findsOneWidget);
+    expect(find.text('Mobile app'), findsNWidgets(2)); // In + Out
     expect(find.text('Absent'), findsOneWidget);
     expect(find.text('Rest day'), findsOneWidget);
-    expect(find.text('Sick Leave (AM)'), findsOneWidget);
+    expect(find.text('On Leave · Sick Leave (AM)'), findsOneWidget);
     expect(find.text('National Heroes Day'), findsOneWidget);
     expect(find.textContaining('14.55'), findsNothing);
     expect(find.textContaining('Makati'), findsNothing);
@@ -215,10 +228,13 @@ void main() {
 
     expect(find.text('Records'), findsOneWidget);
     expect(find.text('File a correction'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Terminal was down'), 200);
+    // The page scrolls down; the tables scroll sideways — scroll the page.
+    final page = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down).first;
+    await tester.scrollUntilVisible(find.text('Terminal was down'), 200, scrollable: page);
     expect(find.text('My correction requests'), findsOneWidget);
     expect(find.text('Pending'), findsOneWidget);
-    expect(find.text('In —  ·  Out 6:00 PM'), findsOneWidget);
+    expect(find.text('REQUESTED OUT'), findsOneWidget);
+    expect(find.textContaining('6:00 PM'), findsOneWidget);
 
     await tester.tap(find.text('Summary'));
     await tester.pumpAndSettle();

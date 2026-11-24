@@ -53,7 +53,15 @@ void main() {
     Future<void> go(String label) async {
       await tester.tap(find.byIcon(Icons.menu));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(label));
+      // The sidebar carries the website's whole Self-Service now: scroll to it.
+      final item = find.descendant(of: find.byType(Drawer), matching: find.text(label));
+      await tester.scrollUntilVisible(
+        item,
+        80,
+        scrollable: find.descendant(of: find.byType(Drawer), matching: find.byType(Scrollable)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(item);
       await tester.pumpAndSettle();
     }
 

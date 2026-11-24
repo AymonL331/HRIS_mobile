@@ -94,7 +94,7 @@ void main() {
     expect(find.text('SELF-SERVICE'), findsNothing);
   });
 
-  testWidgets('the active item wears primary-soft with primary text, as .itemActive does', (tester) async {
+  testWidgets('the active item is primary semibold text only — no tinted box or side marker (2026-11-24)', (tester) async {
     await pumpDrawer(tester, selected: 2);
     final t = HrisTokens.light;
 
@@ -106,8 +106,7 @@ void main() {
     final other = tester.widget<Text>(find.text('Time Clock'));
     expect(other.style!.color, t.text);
 
-    final ink = tester.widget<Ink>(find.ancestor(of: find.text('My Payslips'), matching: find.byType(Ink)));
-    expect((ink.decoration as BoxDecoration).color, t.primarySoft);
+    expect(find.ancestor(of: find.text('My Payslips'), matching: find.byType(Ink)), findsNothing);
   });
 
   testWidgets('the sidebar follows dark mode', (tester) async {

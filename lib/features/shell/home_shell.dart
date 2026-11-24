@@ -36,6 +36,19 @@ import '../tracking/tracking_gaps.dart';
 import '../tracking/tracking_service.dart';
 import '../travel_orders/travel_order_api.dart';
 import '../travel_orders/travel_orders_screen.dart';
+import '../accountabilities/accountabilities_api.dart';
+import '../accountabilities/accountabilities_screen.dart';
+import '../home/home_api.dart';
+import '../home/home_screen.dart';
+import '../leave/leave_api.dart';
+import '../leave/leave_screen.dart';
+import '../leave_calendar/leave_calendar_api.dart';
+import '../leave_calendar/leave_calendar_screen.dart';
+import '../my_profile/my_profile_api.dart';
+import '../my_profile/my_profile_screen.dart';
+import '../overtime/overtime_api.dart';
+import '../overtime/overtime_screen.dart';
+import '../payslips/payslip_detail_screen.dart';
 import 'app_drawer.dart';
 import 'no_employee_screen.dart';
 
@@ -139,8 +152,23 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final user = context.watch<SessionController>().user;
     final hasEmployee = user?.employeeId != null;
     const attendanceTitle = 'My Attendance';
-    final titles = ['Time Clock', attendanceTitle, 'My Payslips', 'Profile Photo', 'Settings', 'My Travel Orders'];
+    final titles = [
+      'My Time Clock', attendanceTitle, 'My Payslips', 'Profile Photo', 'Settings', 'My Travel Orders',
+      // The rest of the website's Self-Service (2026-11-23): new indexes so the
+      // older destinations keep their numbers.
+      'Home', 'My Profile', 'My Accountabilities', 'My Leave', 'Overtime & Holiday Work', 'Leave Calendar',
+    ];
     final session = context.read<SessionController>();
+    void go(int i) => setState(() => _index = i);
+    // Home's links, by the website's sidebar keys (constants/nav.js).
+    const byKey = {
+      'time-clock': 0, 'attendance': 1, 'payslips': 2, 'profile-photo': 3, 'travel-orders': 5,
+      'home': 6, 'profile': 7, 'accountabilities': 8, 'leave': 9, 'overtime': 10, 'leave-calendar': 11,
+    };
+    void navigate(String key) {
+      final i = byKey[key];
+      if (i != null) go(i);
+    }
     final Widget attendance = hasEmployee ? const AttendanceScreen() : const NoEmployeeScreen(what: 'attendance record');
     final pages = <Widget>[
       hasEmployee
@@ -172,14 +200,85 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               active: _index == 5,
             )
           : const NoEmployeeScreen(what: 'travel order'),
+      // 6 HOME — the website's /employee page.
+      hasEmployee
+          ? HomeScreen(
+              api: _optional<HomeApi?>(context) ?? MobileHomeApi(session),
+              username: user?.username ?? '',
+              onNavigate: navigate,
+              onOpenPayslip: (id) => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => PayslipDetailScreen(
+                  payslipId: id,
+                  api: _optional<PayslipApi?>(context) ?? MobilePayslipApi(session),
+                ),
+              )),
+              active: _index == 6,
+            )
+          : const NoEmployeeScreen(what: 'home page'),
+      // 7 MY PROFILE
+      hasEmployee
+          ? MyProfileScreen(
+              api: _optional<MyProfileApi?>(context) ?? MobileMyProfileApi(session),
+              baseUrl: session.env.baseUrl,
+              canSendPhoto: user?.canSendProfilePhoto ?? false,
+              photoApi: _profilePhotoApiOf(context) ?? MobileProfilePhotoApi(session),
+              onPhotoChanged: session.setProfilePhotoUrl,
+              active: _index == 7,
+            )
+          : const NoEmployeeScreen(what: 'profile'),
+      // 8 MY ACCOUNTABILITIES
+      hasEmployee
+          ? AccountabilitiesScreen(
+              api: _optional<AccountabilitiesApi?>(context) ?? MobileAccountabilitiesApi(session),
+              active: _index == 8,
+            )
+          : const NoEmployeeScreen(what: 'accountability record'),
+      // 9 MY LEAVE
+      hasEmployee
+          ? MyLeaveScreen(api: _optional<LeaveApi?>(context) ?? MobileLeaveApi(session), active: _index == 9)
+          : const NoEmployeeScreen(what: 'leave record'),
+      // 10 OVERTIME & HOLIDAY WORK
+      hasEmployee
+          ? OvertimeScreen(
+              api: _optional<OvertimeApi?>(context) ?? MobileOvertimeApi(session),
+              baseUrl: session.env.baseUrl,
+              onNavigate: navigate,
+              active: _index == 10,
+            )
+          : const NoEmployeeScreen(what: 'overtime record'),
+      // 11 LEAVE CALENDAR
+      hasEmployee
+          ? LeaveCalendarScreen(
+              api: _optional<LeaveCalendarApi?>(context) ?? MobileLeaveCalendarApi(session),
+              active: _index == 11,
+            )
+          : const NoEmployeeScreen(what: 'leave calendar'),
     ];
     final sections = [
+      // The website's Self-Service, in its order (constants/nav.js). My Time Clock
+      // (named as on the website) sits after My Attendance, before My Travel
+      // Orders (user 2026-11-24).
       NavSection('Self-Service', [
+        const NavDestination(index: 6, label: 'Home', icon: Icons.home_outlined, selectedIcon: Icons.home),
+        const NavDestination(index: 7, label: 'My Profile', icon: Icons.badge_outlined, selectedIcon: Icons.badge),
         const NavDestination(
-          index: 0,
-          label: 'Time Clock',
-          icon: Icons.punch_clock_outlined,
-          selectedIcon: Icons.punch_clock,
+          index: 2,
+          label: 'My Payslips',
+          icon: Icons.receipt_long_outlined,
+          selectedIcon: Icons.receipt_long,
+        ),
+        const NavDestination(
+          index: 8,
+          label: 'My Accountabilities',
+          icon: Icons.inventory_2_outlined,
+          selectedIcon: Icons.inventory_2,
+        ),
+        const NavDestination(index: 9, label: 'My Leave', icon: Icons.event_available_outlined, selectedIcon: Icons.event_available),
+        const NavDestination(
+          index: 10,
+          label: 'Overtime & Holiday Work',
+          icon: Icons.more_time_outlined,
+          selectedIcon: Icons.more_time,
         ),
         NavDestination(
           index: 1,
@@ -188,10 +287,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           selectedIcon: Icons.calendar_month,
         ),
         const NavDestination(
-          index: 2,
-          label: 'My Payslips',
-          icon: Icons.receipt_long_outlined,
-          selectedIcon: Icons.receipt_long,
+          index: 0,
+          label: 'My Time Clock',
+          icon: Icons.punch_clock_outlined,
+          selectedIcon: Icons.punch_clock,
         ),
         const NavDestination(
           index: 5,
@@ -199,6 +298,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           icon: Icons.location_on_outlined,
           selectedIcon: Icons.location_on,
         ),
+        const NavDestination(index: 11, label: 'Leave Calendar', icon: Icons.date_range_outlined, selectedIcon: Icons.date_range),
       ]),
       const NavSection('Account', [
         NavDestination(
@@ -307,9 +407,17 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            PageHeader(titles[_index]),
+            // Home draws its own "Welcome, …" header, as the website does.
+            if (!(_index == 6 && hasEmployee)) PageHeader(titles[_index]),
             Expanded(
-              child: IndexedStack(index: _index, children: pages),
+              // Hidden pages keep their state but stop animating (a page not yet
+              // opened shows its loading spinner): no ticking off-screen.
+              child: IndexedStack(
+                index: _index,
+                children: [
+                  for (var i = 0; i < pages.length; i++) TickerMode(enabled: i == _index, child: pages[i]),
+                ],
+              ),
             ),
           ],
         ),

@@ -55,6 +55,8 @@ abstract final class Endpoints {
   /// requests, and filing one (the proof photo is staged first; the request then
   /// carries only its URL). All self-scoped on the server.
   static const attendanceSummary = '/api/me/attendance/summary';
+  // My face-enrollment status (the My Attendance card, as the web).
+  static const biometricStatus = '/api/me/biometric';
   static const correctionRequests = '/api/me/correction-requests';
   static const correctionProof = '/api/me/attendance-requests/attachment';
   static const correctionSubmit = '/api/me/attendance-requests';

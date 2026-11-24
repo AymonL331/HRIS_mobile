@@ -389,13 +389,16 @@ class _TravelOrderFormScreenState extends State<TravelOrderFormScreen> {
                           ),
                       ],
                     ),
+                    // Room for the field's floating label, which sits ON its top border
+                    // (it touched "Stop 1" without this — user 2026-11-24).
+                    const SizedBox(height: HrisSpace.s4),
                     TextField(
                       controller: _stops[i].name,
                       enabled: !_busy,
                       maxLength: 160,
                       decoration: const InputDecoration(labelText: 'Place name', hintText: 'e.g. Daraga Branch', counterText: ''),
                     ),
-                    const SizedBox(height: HrisSpace.s2),
+                    const SizedBox(height: HrisSpace.s4),
                     Row(
                       children: [
                         Expanded(

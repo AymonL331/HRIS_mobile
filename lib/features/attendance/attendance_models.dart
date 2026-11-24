@@ -3,6 +3,7 @@ import '../../core/time/manila_time.dart';
 
 int _int(Object? v) => v == null ? 0 : (v is int ? v : int.tryParse('$v') ?? 0);
 bool _flag(Object? v) => v == true || v == 1 || v == '1';
+String? _text(Object? v) => v is String && v.trim().isNotEmpty ? v.trim() : null;
 
 /// One calendar day of the employee's DTR, from `GET /api/me/attendance/calendar`.
 ///
@@ -33,6 +34,16 @@ class DtrDay {
   // correction request or an admin, not by the employee's own punch.
   final bool clockInCorrected;
   final bool clockOutCorrected;
+  // What the web's Late / Undertime / Status / Method columns also read (2026-11-24,
+  // the phone's DTR drawn as the web's table): the employee's own reasons
+  // (migration 128), how each direction was captured, unpaid leave, and a holiday
+  // worked without approval.
+  final String? lateReason;
+  final String? undertimeReason;
+  final String? clockInMethod;
+  final String? clockOutMethod;
+  final String? leavePaymentType;
+  final bool isHolidayUnapproved;
 
   const DtrDay({
     required this.date,
@@ -56,6 +67,12 @@ class DtrDay {
     required this.captureMethod,
     this.clockInCorrected = false,
     this.clockOutCorrected = false,
+    this.lateReason,
+    this.undertimeReason,
+    this.clockInMethod,
+    this.clockOutMethod,
+    this.leavePaymentType,
+    this.isHolidayUnapproved = false,
   });
 
   factory DtrDay.fromJson(Map<String, dynamic> j) => DtrDay(
@@ -80,7 +97,18 @@ class DtrDay {
         captureMethod: j['capture_method'] as String?,
         clockInCorrected: j['clock_in_at'] != null && _flag(j['clock_in_corrected']),
         clockOutCorrected: j['clock_out_at'] != null && _flag(j['clock_out_corrected']),
+        lateReason: _text(j['late_reason']),
+        undertimeReason: _text(j['undertime_reason']),
+        clockInMethod: _text(j['clock_in_method']),
+        clockOutMethod: _text(j['clock_out_method']),
+        leavePaymentType: _text(j['leave_payment_type']),
+        isHolidayUnapproved: _flag(j['is_holiday_unapproved']),
       );
+
+  /// How each direction was captured, as the web's Method cell: the direction's own
+  /// method, else the day's when that time exists.
+  String? get inMethod => clockInMethod ?? (clockInAt != null ? captureMethod : null);
+  String? get outMethod => clockOutMethod ?? (clockOutAt != null ? captureMethod : null);
 
   /// "In corrected" / "Out corrected" / "In + out corrected", or null — the same
   /// fact as the web DTR's Corrected chip (user 2026-11-12).
@@ -234,5 +262,20 @@ class CorrectionRequest {
         status: (j['status'] ?? 'pending').toString(),
         reason: j['reason'] as String?,
         proofPhotoUrl: j['proof_photo_url'] as String?,
+      );
+}
+
+/// My face-enrollment status (`GET /api/me/biometric`) — the web page's card.
+class BiometricStatus {
+  final bool enrolled;
+  final String? modelVersion;
+  final bool consentGiven;
+
+  const BiometricStatus({required this.enrolled, this.modelVersion, this.consentGiven = false});
+
+  factory BiometricStatus.fromJson(Map<String, dynamic> j) => BiometricStatus(
+        enrolled: _flag(j['enrolled']),
+        modelVersion: _text(j['model_version']),
+        consentGiven: _flag(j['consent_given']),
       );
 }

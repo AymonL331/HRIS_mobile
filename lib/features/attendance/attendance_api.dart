@@ -16,6 +16,9 @@ abstract class AttendanceApi {
   /// My latest correction requests, newest date first.
   Future<List<CorrectionRequest>> corrections();
 
+  /// My face-enrollment status (the web page's "Face enrollment" card).
+  Future<BiometricStatus> biometric();
+
   /// Stage the proof photo; returns the stored URL the request then carries.
   Future<String> stageProof({required Uint8List bytes, required String mimeType, required String name});
 
@@ -66,6 +69,12 @@ class MobileAttendanceApi implements AttendanceApi {
           final items = ((d as Map<String, dynamic>?)?['items'] as List?) ?? const [];
           return items.whereType<Map<String, dynamic>>().map(CorrectionRequest.fromJson).toList();
         },
+      ));
+
+  @override
+  Future<BiometricStatus> biometric() => session.guard(() => session.client.get(
+        Endpoints.biometricStatus,
+        parse: (d) => BiometricStatus.fromJson((d as Map<String, dynamic>?) ?? const {}),
       ));
 
   @override

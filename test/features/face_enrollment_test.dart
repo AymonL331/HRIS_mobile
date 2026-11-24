@@ -451,7 +451,7 @@ void main() {
       expect(captures, 0);
       expect(enrollment.submits, isEmpty);
 
-      await tester.tap(find.text('Back to Time Clock'));
+      await tester.tap(find.text('Back to My Time Clock'));
       await settle(tester);
       expect(mounted.api.statusCalls, greaterThan(loadsBefore));
       expect(find.text('Enroll my face'), findsNothing);

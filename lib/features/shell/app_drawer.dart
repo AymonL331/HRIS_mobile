@@ -245,8 +245,8 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = HrisTokens.of(context);
-    // Active = nav-active-bg + petrol marker + petrol text (the text-safe tint
-    // in dark, where the brand petrol is under 4.5:1 on the active fill).
+    // Active = petrol icon + petrol semibold text only (user 2026-11-24: "remove the
+    // sidebar blue default outline" — no tinted box, no side marker).
     final fg = selected ? t.primaryText : t.text;
     return Semantics(
       selected: selected,
@@ -255,41 +255,21 @@ class _NavItem extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(HrisRadius.control),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: selected ? t.primarySoft : Colors.transparent,
-              borderRadius: BorderRadius.circular(HrisRadius.control),
-            ),
-            child: Stack(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s3, vertical: 14),
+            child: Row(
               children: [
-                if (selected)
-                  Positioned(
-                    left: 0,
-                    top: 12,
-                    bottom: 12,
-                    child: Container(
-                      width: 3,
-                      decoration: BoxDecoration(color: t.primaryText, borderRadius: BorderRadius.circular(1)),
+                Icon(selected ? item.selectedIcon : item.icon, size: 20, color: selected ? t.primaryText : t.text2),
+                const SizedBox(width: HrisSpace.s3),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: HrisType.sm,
+                      fontWeight: selected ? HrisType.semibold : HrisType.medium,
+                      height: 20 / 14,
+                      color: fg,
                     ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s3, vertical: 14),
-                  child: Row(
-                    children: [
-                      Icon(selected ? item.selectedIcon : item.icon, size: 20, color: selected ? t.primaryText : t.text2),
-                      const SizedBox(width: HrisSpace.s3),
-                      Expanded(
-                        child: Text(
-                          item.label,
-                          style: TextStyle(
-                            fontSize: HrisType.sm,
-                            fontWeight: selected ? HrisType.semibold : HrisType.medium,
-                            height: 20 / 14,
-                            color: fg,
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],

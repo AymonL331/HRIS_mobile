@@ -74,7 +74,7 @@ void main() {
 
     expect(find.byType(ChangePasswordScreen), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget); // the forced escape hatch
-    expect(find.text('Time Clock'), findsNothing);
+    expect(find.text('My Time Clock'), findsNothing);
 
     // Local rule first: nothing sent.
     await tester.tap(find.text('Save new password'));
@@ -99,7 +99,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(session.state, isA<SignedIn>());
     expect(find.byType(ChangePasswordScreen), findsNothing);
-    expect(find.text('Time Clock'), findsWidgets);
+    expect(find.text('My Time Clock'), findsWidgets);
   });
 }
 

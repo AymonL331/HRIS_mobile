@@ -37,6 +37,8 @@ class AttendanceController extends ChangeNotifier {
 
   // MY CORRECTION REQUESTS (the web's table under the records).
   List<CorrectionRequest> _corrections = const [];
+  // Face enrollment (the web page's card); null until loaded or when it failed.
+  BiometricStatus? _biometric;
 
   AttendanceController({required this.api, DateTime Function()? nowUtc})
       : nowUtc = nowUtc ?? (() => DateTime.now().toUtc());
@@ -51,6 +53,10 @@ class AttendanceController extends ChangeNotifier {
   bool get summaryLoading => _summaryLoading;
   String? get summaryError => _summaryError;
   List<CorrectionRequest> get corrections => List.unmodifiable(_corrections);
+  BiometricStatus? get biometric => _biometric;
+
+  /// Every loaded day in one list, newest first — the web's "Daily time record".
+  List<DtrDay> get days => [for (final m in _months) ...m.days];
 
   void _notify() {
     if (!_disposed) notifyListeners();
@@ -65,7 +71,16 @@ class AttendanceController extends ChangeNotifier {
   Future<void> loadCurrent() async {
     _months.clear();
     final t = ManilaTime.toManila(nowUtc());
-    await Future.wait([_load(t.year, t.month), loadCorrections()]);
+    await Future.wait([_load(t.year, t.month), loadCorrections(), loadBiometric()]);
+  }
+
+  Future<void> loadBiometric() async {
+    try {
+      _biometric = await api.biometric();
+      _notify();
+    } on ApiException {
+      // No card rather than a second error: the DTR's own banner covers a dead connection.
+    }
   }
 
   /// The correction history is a companion to the record: a failure here never

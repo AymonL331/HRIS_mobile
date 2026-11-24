@@ -387,7 +387,7 @@ class _ClosedCard extends StatelessWidget {
           FilledButton(
             onPressed: onBack,
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            child: const Text('Back to Time Clock'),
+            child: const Text('Back to My Time Clock'),
           ),
         ],
       ),
