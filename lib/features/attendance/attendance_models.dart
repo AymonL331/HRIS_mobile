@@ -34,6 +34,15 @@ class DtrDay {
   // correction request or an admin, not by the employee's own punch.
   final bool clockInCorrected;
   final bool clockOutCorrected;
+  // The corrected side(s) came from the DTR import (user 2026-11-24): the chip
+  // reads "Import", and the punch it replaced opens from it, as on the web.
+  final bool correctedFromImport;
+  final DateTime? clockInOriginalAt;
+  final String? clockInOriginalMethod;
+  final DateTime? clockOutOriginalAt;
+  final String? clockOutOriginalMethod;
+  final String? correctionSource;
+  final String? correctedByName;
   // What the web's Late / Undertime / Status / Method columns also read (2026-11-24,
   // the phone's DTR drawn as the web's table): the employee's own reasons
   // (migration 128), how each direction was captured, unpaid leave, and a holiday
@@ -67,6 +76,13 @@ class DtrDay {
     required this.captureMethod,
     this.clockInCorrected = false,
     this.clockOutCorrected = false,
+    this.correctedFromImport = false,
+    this.clockInOriginalAt,
+    this.clockInOriginalMethod,
+    this.clockOutOriginalAt,
+    this.clockOutOriginalMethod,
+    this.correctionSource,
+    this.correctedByName,
     this.lateReason,
     this.undertimeReason,
     this.clockInMethod,
@@ -97,6 +113,13 @@ class DtrDay {
         captureMethod: j['capture_method'] as String?,
         clockInCorrected: j['clock_in_at'] != null && _flag(j['clock_in_corrected']),
         clockOutCorrected: j['clock_out_at'] != null && _flag(j['clock_out_corrected']),
+        correctedFromImport: _flag(j['corrected_from_import']),
+        clockInOriginalAt: ManilaTime.parseUtc(j['clock_in_original_at'] as String?),
+        clockInOriginalMethod: _text(j['clock_in_original_method']),
+        clockOutOriginalAt: ManilaTime.parseUtc(j['clock_out_original_at'] as String?),
+        clockOutOriginalMethod: _text(j['clock_out_original_method']),
+        correctionSource: _text(j['correction_source']),
+        correctedByName: _text(j['corrected_by_name']),
         lateReason: _text(j['late_reason']),
         undertimeReason: _text(j['undertime_reason']),
         clockInMethod: _text(j['clock_in_method']),

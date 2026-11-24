@@ -161,6 +161,38 @@ void main() {
     expect(find.text('Load previous month'), findsOneWidget);
   });
 
+  testWidgets('a day the DTR import replaced reads Import and opens the original web clock (2026-11-24)', (tester) async {
+    final api = FakeAttendanceApi({
+      '2026-09': [
+        row('2026-09-11', status: 'late', inAt: '2026-09-11T00:24:00.000Z', outAt: '2026-09-11T09:01:00.000Z', extra: {
+          'capture_method': 'manual', 'clock_in_method': 'manual', 'clock_out_method': 'manual',
+          'clock_in_corrected': 1, 'clock_out_corrected': 1, 'corrected_from_import': 1, 'correction_source': 'admin',
+          'clock_in_original_at': '2026-09-11T00:24:48.000Z', 'clock_in_original_method': 'web',
+          'clock_out_original_at': '2026-09-11T09:00:58.000Z', 'clock_out_original_method': 'web',
+        }),
+        row('2026-09-10', status: 'present', inAt: '2026-09-10T00:00:00.000Z', outAt: '2026-09-10T09:00:00.000Z',
+            extra: {'capture_method': 'web', 'clock_in_corrected': 1, 'correction_source': 'admin'}),
+      ],
+    });
+    final c = AttendanceController(api: api, nowUtc: () => DateTime.utc(2026, 9, 11, 3));
+    await tester.pumpWidget(MaterialApp(
+      home: ChangeNotifierProvider<AttendanceController>.value(value: c, child: const Scaffold(body: AttendanceScreen())),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Import'), findsNWidgets(2)); // In + Out of the imported day
+    expect(find.text('Corrected'), findsOneWidget); // an admin's own edit stays Corrected
+    expect(find.text('Web clock'), findsOneWidget); // its untouched clock-out
+
+    await tester.ensureVisible(find.byKey(const Key('dtr_trail_2026-09-11_in')));
+    await tester.tap(find.byKey(const Key('dtr_trail_2026-09-11_in')));
+    await tester.pumpAndSettle();
+    expect(find.text('Imported time'), findsOneWidget);
+    expect(find.text('8:24 AM (Web clock)'), findsOneWidget);
+    expect(find.text('5:00 PM (Web clock)'), findsOneWidget);
+    expect(find.text('Source: Imported DTR file (Excel)'), findsOneWidget);
+  });
+
   test('summary periods are Manila days, as the web periodRange', () {
     // 2026-10-27 18:00 UTC is already Oct 28 in Manila.
     final c = AttendanceController(api: FakeAttendanceApi({}), nowUtc: () => DateTime.utc(2026, 10, 27, 18));

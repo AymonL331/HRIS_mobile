@@ -380,6 +380,8 @@ class _DtrTable extends StatelessWidget {
     }
 
     Widget methodCell(DtrDay d) {
+      // A corrected side is a button, as on the web: it opens the time it replaced.
+      // A side the DTR import replaced reads "Import" (user 2026-11-24).
       Widget line(String dir, String? method, bool corrected) => Padding(
             padding: const EdgeInsets.only(bottom: 2),
             child: Row(
@@ -387,7 +389,13 @@ class _DtrTable extends StatelessWidget {
               children: [
                 SizedBox(width: 28, child: Text(dir, style: TextStyle(fontSize: HrisType.xs, color: t.muted))),
                 corrected
-                    ? const StatusBadge('Corrected', tone: StatusTone.warning)
+                    ? InkWell(
+                        key: Key('dtr_trail_${d.date}_${dir.toLowerCase()}'),
+                        onTap: () => _showTrail(context, d),
+                        child: d.correctedFromImport
+                            ? StatusBadge(_methodLabels['import']!, tone: StatusTone.neutral)
+                            : const StatusBadge('Corrected', tone: StatusTone.warning),
+                      )
                     : StatusBadge(_methodLabels[method] ?? method ?? '—',
                         tone: method == 'mobile' || method == 'web' ? StatusTone.info : StatusTone.neutral),
               ],
@@ -420,6 +428,56 @@ class _DtrTable extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The trail of a corrected / imported day — the web's "Corrected time" /
+/// "Imported time" dialog: what each side was before, and where it came from.
+void _showTrail(BuildContext context, DtrDay d) {
+  final t = HrisTokens.of(context);
+  final body = TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.text);
+  final muted = TextStyle(fontSize: HrisType.sm, height: 20 / 14, color: t.muted);
+  String was(DateTime? at, String? method) => at == null
+      ? 'No punch'
+      : '${ManilaTime.time(at)}${method == null ? '' : ' (${_methodLabels[method] ?? method})'}';
+  Widget side(String label, DateTime? orig, String? method, DateTime? now) => Padding(
+        padding: const EdgeInsets.only(bottom: HrisSpace.s2),
+        child: Row(
+          children: [
+            SizedBox(width: 72, child: Text(label, style: muted)),
+            Flexible(child: Text(was(orig, method), style: body)),
+            Padding(padding: const EdgeInsets.symmetric(horizontal: HrisSpace.s2), child: Text('→', style: muted)),
+            Text(now == null ? '—' : ManilaTime.time(now), style: body.copyWith(fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+  final source = d.correctionSource == 'request'
+      ? 'Approved correction request'
+      : d.correctedFromImport
+          ? 'Imported DTR file (Excel)'
+          : d.correctionSource == 'admin'
+              ? 'Corrected by an admin'
+              : '—';
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(d.correctedFromImport ? 'Imported time' : 'Corrected time'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(ManilaTime.dateOnly(d.date), style: muted),
+          const SizedBox(height: HrisSpace.s3),
+          if (d.clockInCorrected) side('Clock in', d.clockInOriginalAt, d.clockInOriginalMethod, d.clockInAt),
+          if (d.clockOutCorrected) side('Clock out', d.clockOutOriginalAt, d.clockOutOriginalMethod, d.clockOutAt),
+          const SizedBox(height: HrisSpace.s2),
+          Text('Source: $source', style: body),
+          if (d.correctedByName != null)
+            Text('${d.correctedFromImport ? 'Imported' : 'Corrected'} by: ${d.correctedByName}', style: body),
+        ],
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+    ),
+  );
 }
 
 /// MY CORRECTION REQUESTS — the web's table: Date · Requested In · Requested Out ·
