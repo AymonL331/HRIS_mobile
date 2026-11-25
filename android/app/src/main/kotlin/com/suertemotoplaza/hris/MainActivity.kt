@@ -9,6 +9,7 @@ import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
+import android.os.SystemClock
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.provider.Settings
@@ -113,6 +114,18 @@ class MainActivity : FlutterActivity() {
                     } else null
                     m["model"] = Build.MODEL
                     m["osVersion"] = Build.VERSION.RELEASE
+                    result.success(m)
+                }
+                // OFFLINE CLOCK-IN (2026-11-24): a clock the user cannot set — the time
+                // since the phone started — and which start this is. The app keeps the
+                // last server time beside it, so a punch made with no signal can say
+                // when it happened even if the phone's own clock was changed.
+                "clock" -> {
+                    val m = HashMap<String, Any?>()
+                    m["elapsedMs"] = SystemClock.elapsedRealtime()
+                    m["bootCount"] = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        guard { Settings.Global.getInt(contentResolver, Settings.Global.BOOT_COUNT) }
+                    } else null
                     result.success(m)
                 }
                 "openBatterySaver" -> result.success(

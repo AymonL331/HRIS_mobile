@@ -15,6 +15,10 @@ abstract final class Endpoints {
 
   static const mobileClockStatus = '/api/me/mobile-clock/status';
   static const mobileClock = '/api/me/mobile-clock';
+  /// OFFLINE clock-in (server migration 132): the phone's pack (own face code +
+  /// limits), and a punch kept while there was no signal.
+  static const offlineClockKit = '/api/me/offline-clock/kit';
+  static const offlineClock = '/api/me/offline-clock';
   /// Why I was late / left early (server migration 128).
   static String attendanceReason(int attendanceLogId) => '/api/me/attendance/$attendanceLogId/reason';
 

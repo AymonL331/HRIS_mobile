@@ -222,6 +222,9 @@ class _TimeClockScreenState extends State<TimeClockScreen>
               ),
               const SizedBox(height: HrisSpace.s3),
             ],
+            // OFFLINE clock-in (2026-11-24): no signal, punches waiting, and what
+            // the server said about the ones already sent.
+            _OfflineBanners(controller: c),
             _Header(
               name: status.employeeName,
               code: status.employeeCode,
@@ -280,6 +283,7 @@ class _TimeClockScreenState extends State<TimeClockScreen>
                 outcome: c.outcome!,
                 onDismiss: c.dismissOutcome,
                 onConsent: c.grantConsent,
+                onSaveForHr: c.saveForHr,
               ),
             ],
           ],
@@ -620,7 +624,6 @@ class _PunchButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = controller.status!;
     final busy = controller.busy;
     final t = HrisTokens.of(context);
     final phaseText = switch (controller.phase) {
@@ -640,7 +643,8 @@ class _PunchButtons extends StatelessWidget {
         MaterialPageRoute<FaceResult>(
           builder: (_) => FaceCaptureScreen(
             direction: direction,
-            issueChallenge: controller.api.faceChallenge,
+            // The server's challenge — or, with no signal, one the phone picks.
+            issueChallenge: controller.issueChallenge,
             clockPhoto: true,
           ),
           fullscreenDialog: true,
@@ -654,7 +658,7 @@ class _PunchButtons extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FilledButton.icon(
-          onPressed: !busy && s.canClockIn
+          onPressed: !busy && controller.canClockIn
               ? () => controller.punch('in', capture: capture)
               : null,
           icon: const Icon(Icons.login),
@@ -663,7 +667,7 @@ class _PunchButtons extends StatelessWidget {
         ),
         const SizedBox(height: HrisSpace.s3),
         FilledButton.tonalIcon(
-          onPressed: !busy && s.canClockOut
+          onPressed: !busy && controller.canClockOut
               ? () => controller.punch('out', capture: capture)
               : null,
           icon: const Icon(Icons.logout),
@@ -703,10 +707,12 @@ class _OutcomeCard extends StatelessWidget {
   final PunchOutcome outcome;
   final VoidCallback onDismiss;
   final VoidCallback onConsent;
+  final VoidCallback onSaveForHr;
   const _OutcomeCard({
     required this.outcome,
     required this.onDismiss,
     required this.onConsent,
+    required this.onSaveForHr,
   });
 
   Widget _mark(BuildContext context, {required bool ok}) {
@@ -757,6 +763,36 @@ class _OutcomeCard extends StatelessWidget {
             MessageBanner.success(parts.join(' '), onClose: onDismiss),
           ],
         );
+      // No signal: kept on the phone, sent by itself when the signal is back.
+      case PunchSavedOffline(:final punch) when punch.noMatch:
+        final what = punch.direction == 'in' ? 'Time In' : 'Time Out';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _mark(context, ok: true),
+            const SizedBox(height: HrisSpace.s3),
+            MessageBanner.info(
+              '$what at ${ManilaTime.time(punch.takenAt)} saved for HR to check, with your photo and location. '
+              'It is sent by itself when you are back online and goes on your DTR only when HR approves it.',
+              onClose: onDismiss,
+            ),
+          ],
+        );
+      case PunchSavedOffline(:final punch, :final warnLowAccuracy):
+        final what = punch.direction == 'in' ? 'Timed in' : 'Timed out';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _mark(context, ok: true),
+            const SizedBox(height: HrisSpace.s3),
+            MessageBanner.success(
+              '$what at ${ManilaTime.time(punch.takenAt)} — saved on this phone because there is no internet. '
+              'It is sent by itself when you are back online; keep the app installed until then.'
+              '${warnLowAccuracy ? ' Your GPS reading was coarse, so HR may check it.' : ''}',
+              onClose: onDismiss,
+            ),
+          ],
+        );
       case PunchInfo(:final message):
         return MessageBanner.info(message, onClose: onDismiss);
       case PunchBlocked(:final message):
@@ -773,6 +809,31 @@ class _OutcomeCard extends StatelessWidget {
         );
       case PunchFailure(:final message):
         return MessageBanner.error(message, onClose: onDismiss);
+      // No signal + 3 failed face tries in a row (2026-11-25): HR decides.
+      case PunchOfflineNoMatch(:final direction, :final tries, :final threshold, :final showScores):
+        final what = direction == 'in' ? 'Time In' : 'Time Out';
+        final scores = showScores
+            ? ' Scores: ${tries.map((d) => d.toStringAsFixed(3)).join(', ')} (limit ${threshold.toStringAsFixed(2)}).'
+            : '';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            MessageBanner.warning(
+              'Your face was not recognized ${tries.length} times.$scores '
+              'You can save this $what for HR to check. It goes on your DTR only when HR approves it.',
+            ),
+            const SizedBox(height: HrisSpace.s2),
+            FilledButton(
+              onPressed: onSaveForHr,
+              child: const Text('Save for HR to check'),
+            ),
+            const SizedBox(height: HrisSpace.s1),
+            TextButton(
+              onPressed: onDismiss,
+              child: const Text('Try again instead'),
+            ),
+          ],
+        );
       case PunchNeedsConsent():
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -825,6 +886,48 @@ class _OutcomeCard extends StatelessWidget {
           ],
         );
     }
+  }
+}
+
+/// OFFLINE clock-in (2026-11-24): "no internet" with what is waiting to be sent,
+/// and one line per punch the server has answered (recorded / waiting for HR).
+class _OfflineBanners extends StatelessWidget {
+  final TimeClockController controller;
+  const _OfflineBanners({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final o = controller.offline;
+    if (o == null) return const SizedBox.shrink();
+    final pending = o.pending;
+    final children = <Widget>[];
+    if (controller.offlineMode || pending.isNotEmpty) {
+      final waiting = pending
+          .map((p) => '${p.direction == 'in' ? 'Time In' : 'Time Out'} ${ManilaTime.shortDate(p.localDate)} ${ManilaTime.time(p.takenAt)}')
+          .join(' · ');
+      final text = controller.offlineMode
+          ? 'No internet. Time In and Time Out still work: they are kept on this phone and sent by themselves when you are back online.'
+          : 'Sending the time clocks kept on this phone…';
+      children.add(MessageBanner.warning(
+        pending.isEmpty ? text : '$text Waiting to send: $waiting.',
+        key: const Key('offline_banner'),
+      ));
+    }
+    for (final r in o.results) {
+      children.add(Padding(
+        padding: EdgeInsets.only(top: children.isEmpty ? 0 : HrisSpace.s2),
+        child: r.recorded
+            ? MessageBanner.success(r.sentence, onClose: () => o.dismissResult(r.clientUuid))
+            : r.status == 'review'
+                ? MessageBanner.info(r.sentence, onClose: () => o.dismissResult(r.clientUuid))
+                : MessageBanner.error(r.sentence, onClose: () => o.dismissResult(r.clientUuid)),
+      ));
+    }
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: HrisSpace.s3),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+    );
   }
 }
 

@@ -97,9 +97,13 @@ class FakeClockApi implements ClockApi {
   final reasons = <Map<String, dynamic>>[];
   Object? reasonError;
 
+  /// Thrown by status() when set (e.g. no signal: ApiException.network).
+  Object? statusError;
+
   @override
   Future<ClockStatus> status() async {
     statusCalls++;
+    if (statusError != null) throw statusError!;
     return ClockStatus.fromJson(status_);
   }
 
@@ -162,9 +166,12 @@ class FakeFixService implements LocationFixService {
   bool timeout = false;
   int acquired = 0;
 
+  Duration? lastTimeLimit;
+
   @override
-  Future<LocationFix> acquire() async {
+  Future<LocationFix> acquire({Duration timeLimit = const Duration(seconds: 15)}) async {
     acquired++;
+    lastTimeLimit = timeLimit;
     if (timeout) throw const FixTimeout();
     return next;
   }

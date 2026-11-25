@@ -182,6 +182,10 @@ class ClockStatus {
   /// there is none, or from a server that does not send it.
   final String? travelOrderNumber;
 
+  /// The server's reply as it came, kept so the Time Clock can open with no
+  /// signal on the last screen it had (offline clock-in, 2026-11-24).
+  final Map<String, dynamic>? raw;
+
   const ClockStatus({
     required this.serverTime,
     required this.timezone,
@@ -198,6 +202,7 @@ class ClockStatus {
     this.tracking = TrackingState.inactive,
     this.travelOrderToday = false,
     this.travelOrderNumber,
+    this.raw,
   });
 
   bool get canClockIn => today == null || today!.clockInAt == null;
@@ -229,6 +234,7 @@ class ClockStatus {
       tracking: TrackingState.fromJson(j['tracking'] as Map<String, dynamic>?),
       travelOrderToday: j['travel_order_today'] == true,
       travelOrderNumber: _text((j['travel_order'] as Map<String, dynamic>?)?['to_number']),
+      raw: j,
     );
   }
 }

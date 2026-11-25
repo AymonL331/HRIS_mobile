@@ -107,7 +107,7 @@ Map<String, String> _v(String c, String n, String k) => validateChangePassword(c
 
 class _NoFix implements LocationFixService {
   @override
-  Future<LocationFix> acquire() async => throw const FixTimeout();
+  Future<LocationFix> acquire({Duration timeLimit = const Duration(seconds: 15)}) async => throw const FixTimeout();
 }
 
 class _StubClock implements ClockApi {

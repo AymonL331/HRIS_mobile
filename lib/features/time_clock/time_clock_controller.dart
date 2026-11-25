@@ -4,9 +4,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/http/api_exception.dart';
 import '../../core/location/location_fix.dart';
+import '../../core/time/manila_time.dart';
 import '../../core/time/server_clock.dart';
 import '../face/face_capture_screen.dart';
 import '../face/face_models.dart';
+import '../offline_clock/offline_clock_service.dart';
+import '../offline_clock/offline_models.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../tracking/phone_setup.dart';
 import '../tracking/tracking_models.dart';
@@ -55,6 +58,24 @@ class PunchNeedsConsent extends PunchOutcome {
   const PunchNeedsConsent();
 }
 
+/// No signal: the face matched on the phone and the punch is kept here until it
+/// can be sent (offline clock-in, 2026-11-24).
+class PunchSavedOffline extends PunchOutcome {
+  final OfflinePunch punch;
+  final bool warnLowAccuracy;
+  const PunchSavedOffline(this.punch, {required this.warnLowAccuracy});
+}
+
+/// No signal and the face did not match on the phone 3 times in a row
+/// (2026-11-25): the screen offers "Save for HR to check".
+class PunchOfflineNoMatch extends PunchOutcome {
+  final String direction;
+  final List<double> tries;
+  final double threshold;
+  final bool showScores;
+  const PunchOfflineNoMatch({required this.direction, required this.tries, required this.threshold, required this.showScores});
+}
+
 /// Refused on the phone at clock-in: a setting work-hours recording needs is
 /// off (location "all the time", precise, notifications, battery). The screen
 /// offers a "Fix it" button (2026-11-13).
@@ -95,6 +116,39 @@ class TimeClockController extends ChangeNotifier {
   /// owns the dialog's BuildContext. Null = nothing to ask.
   BeforeClockOut? beforeClockOut;
 
+  /// OFFLINE clock-in (2026-11-24). Null = the phone never clocks offline (tests
+  /// not about it).
+  final OfflineClockService? offline;
+
+  /// The last status load could not reach the server: the screen shows the last
+  /// one it had and punches are kept on the phone.
+  bool _offlineMode = false;
+  bool get offlineMode => _offlineMode;
+  final Set<String> _localNonces = <String>{};
+  Timer? _retry;
+
+  /// How many failed offline face tries in a row before "Save for HR to check".
+  static const offlineTriesBeforeHr = 3;
+
+  /// Show the face score when the offline check fails. Test builds only:
+  /// `--dart-define=SHOW_FACE_SCORE=true` (2026-11-25).
+  final bool showFaceScore;
+
+  // The failed offline face tries in a row, for one direction, and the last
+  // one's capture + fix (what "Save for HR to check" keeps).
+  final List<double> _offlineMisses = <double>[];
+  String? _missDirection;
+  LocationFix? _missFix;
+  FaceCapture? _missCapture;
+  bool _missLowAccuracy = false;
+
+  void _clearMisses() {
+    _offlineMisses.clear();
+    _missDirection = null;
+    _missFix = null;
+    _missCapture = null;
+  }
+
   bool _loading = false;
   String? _loadError;
   ClockStatus? _status;
@@ -113,7 +167,11 @@ class TimeClockController extends ChangeNotifier {
     this.reminders,
     this.clockInCheck,
     this.beforeClockOut,
-  }) : clock = clock ?? ServerClock();
+    this.offline,
+    this.showFaceScore = const bool.fromEnvironment('SHOW_FACE_SCORE'),
+  }) : clock = clock ?? ServerClock() {
+    offline?.addListener(_notify);
+  }
 
   bool get loading => _loading;
   String? get loadError => _loadError;
@@ -173,14 +231,185 @@ class TimeClockController extends ChangeNotifier {
       _status = s;
       clock.sync(s.serverTime);
       _loadError = null;
+      _offlineMode = false;
       _syncTracking(s.tracking);
       _syncReminders(s);
+      unawaited(_afterOnline(s));
     } on ApiException catch (e) {
-      _loadError = e.message;
+      final cached = e.isNetwork ? await _cachedStatus() : null;
+      if (cached != null) {
+        // NO SIGNAL: keep (or bring back) the last screen; punches go to the phone.
+        _status = _status ?? cached;
+        _offlineMode = true;
+        _loadError = null;
+      } else {
+        _loadError = e.message;
+      }
     } finally {
       _loading = false;
+      _armRetry();
       _notify();
     }
+  }
+
+  // Back online: remember the server time beside the phone's running clock and
+  // the screen itself, send what was kept offline, refresh the face pack.
+  Future<void> _afterOnline(ClockStatus s) async {
+    final o = offline;
+    if (o == null) return;
+    await o.onServerTime(s.serverTime);
+    if (s.raw != null) await o.cacheStatus(s.raw!);
+    final sent = await o.sync();
+    if (sent > 0 && !_disposed) await load(silent: true);
+    await o.refreshKit(modelVersion: s.face.modelVersion);
+  }
+
+  // The last screen the server sent, with "today" emptied when it was another day.
+  Future<ClockStatus?> _cachedStatus() async {
+    final o = offline;
+    if (o == null) return null;
+    await o.ensureLoaded();
+    final raw = await o.cachedStatus();
+    if (raw == null) return null;
+    final copy = Map<String, dynamic>.from(raw);
+    if (copy['local_date'] != _todayLocal) copy['today'] = null;
+    try {
+      return ClockStatus.fromJson(copy);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // While offline or with punches waiting, try again every minute (the moment
+  // the signal is back, the waiting punches go).
+  void _armRetry() {
+    final waiting = _offlineMode || (offline?.pending.isNotEmpty ?? false);
+    if (!waiting) {
+      _retry?.cancel();
+      _retry = null;
+      return;
+    }
+    _retry ??= Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!busy && !_loading && !_disposed) load(silent: true);
+    });
+  }
+
+  String get _todayLocal => ManilaTime.toManila(clock.nowUtc()).toIso8601String().substring(0, 10);
+
+  /// Time In is offered: the server's day has no clock-in, and none is waiting
+  /// on the phone for today.
+  bool get canClockIn {
+    final s = _status;
+    if (s == null) return false;
+    return s.canClockIn && !(offline?.hasPending('in', _todayLocal) ?? false);
+  }
+
+  /// Time Out is offered: clocked in (on the server, or on the phone today) and
+  /// no clock-out waiting on the phone for today.
+  bool get canClockOut {
+    final s = _status;
+    if (s == null) return false;
+    final o = offline;
+    final inToday = s.canClockOut || (o?.hasPending('in', _todayLocal) ?? false);
+    return inToday && !(o?.hasPending('out', _todayLocal) ?? false);
+  }
+
+  /// The liveness challenge for a punch: the server's, or — with no signal and a
+  /// face pack on the phone — one the phone picks itself.
+  Future<FaceChallenge> issueChallenge(String direction) async {
+    final o = offline;
+    FaceChallenge local() {
+      final ch = o!.localChallenge();
+      _localNonces.add(ch.nonce);
+      return ch;
+    }
+
+    if (_offlineMode && o?.kit != null) return local();
+    try {
+      return await api.faceChallenge(direction);
+    } on ApiException catch (e) {
+      if (e.isNetwork && o?.kit != null) {
+        _offlineMode = true;
+        return local();
+      }
+      rethrow;
+    }
+  }
+
+  // Keep the punch on the phone: match the face against the phone's own pack first.
+  Future<void> _saveOffline(String direction, LocationFix fix, FaceCapture capture, bool warnLowAccuracy) async {
+    final o = offline;
+    final kit = o?.kit;
+    if (o == null || kit == null) {
+      _fail(const PunchFailure(
+          'No internet, and this phone does not have your face for offline use yet. Open the app once with internet, then you can clock in even without signal.'));
+      return;
+    }
+    if (kit.modelVersion.isNotEmpty && capture.modelVersion != kit.modelVersion) {
+      _fail(const PunchFailure('No internet, and the face check on this phone needs an update. Try again when you have internet.'));
+      return;
+    }
+    final distance = kit.bestDistance(capture.embedding);
+    if (distance == null || distance > kit.threshold) {
+      if (_missDirection != direction) _clearMisses();
+      _missDirection = direction;
+      _offlineMisses.add(distance ?? 99);
+      _missFix = fix;
+      _missCapture = capture;
+      _missLowAccuracy = warnLowAccuracy;
+      if (_offlineMisses.length >= offlineTriesBeforeHr) {
+        _fail(PunchOfflineNoMatch(
+          direction: direction,
+          tries: List.unmodifiable(_offlineMisses),
+          threshold: kit.threshold,
+          showScores: showFaceScore,
+        ));
+        return;
+      }
+      final score = showFaceScore && distance != null
+          ? ' (score ${distance.toStringAsFixed(3)}, limit ${kit.threshold.toStringAsFixed(2)})'
+          : '';
+      _fail(PunchFailure('Face not recognized$score. Please try again in good light, facing the camera. '
+          'Try ${_offlineMisses.length} of $offlineTriesBeforeHr.'));
+      return;
+    }
+    _clearMisses();
+    final punch = await o.save(direction: direction, fix: fix, capture: capture, phoneDistance: distance);
+    _offlineMode = true;
+    _outcome = PunchSavedOffline(punch, warnLowAccuracy: warnLowAccuracy);
+    _phase = ClockPhase.idle;
+    _armRetry();
+    _notify();
+    // Maybe the signal is already back.
+    unawaited(load(silent: true));
+  }
+
+  /// "Save for HR to check": keep the last failed offline try (its photo, place
+  /// and time) with every try's score. It goes to HR's Offline Clock-ins as
+  /// Needs review and is never put on the DTR by itself.
+  Future<void> saveForHr() async {
+    final o = offline;
+    final fix = _missFix;
+    final capture = _missCapture;
+    final direction = _missDirection;
+    if (o == null || fix == null || capture == null || direction == null || busy) return;
+    final tries = List<double>.of(_offlineMisses);
+    final warn = _missLowAccuracy;
+    _clearMisses();
+    final punch = await o.save(
+      direction: direction,
+      fix: fix,
+      capture: capture,
+      phoneDistance: tries.isEmpty ? 99 : tries.last,
+      noMatch: true,
+      phoneTries: tries,
+    );
+    _offlineMode = true;
+    _outcome = PunchSavedOffline(punch, warnLowAccuracy: warn);
+    _phase = ClockPhase.idle;
+    _armRetry();
+    _notify();
+    unawaited(load(silent: true));
   }
 
   /// Make the phone match the server after every status load — which follows
@@ -268,9 +497,20 @@ class TimeClockController extends ChangeNotifier {
       }
     }
 
+    // Send anything kept offline FIRST, so the server gets the day in order.
+    final o = offline;
+    if (!_offlineMode && o != null && o.pending.isNotEmpty) await o.sync();
+    // No signal and no face pack on this phone yet: say so before the GPS wait.
+    if (_offlineMode && o != null && o.kit == null) {
+      _fail(const PunchFailure(
+          'No internet, and this phone does not have your face for offline use yet. Open the app once with internet, then you can clock in even without signal.'));
+      return;
+    }
+
     LocationFix fix;
     try {
-      fix = await fixes.acquire();
+      // With no data the GPS finds the satellites alone, which takes longer.
+      fix = await fixes.acquire(timeLimit: Duration(seconds: _offlineMode ? 45 : 15));
     } on FixTimeout {
       _fail(const PunchFailure("Couldn't get a GPS fix in 15 seconds. Step outside or near a window and try again."));
       return;
@@ -307,6 +547,12 @@ class TimeClockController extends ChangeNotifier {
         return;
     }
 
+    // A challenge the phone picked (no signal): the punch stays on the phone.
+    if (_localNonces.remove(faceCapture.nonce)) {
+      await _saveOffline(direction, fix, faceCapture, warnLowAccuracy);
+      return;
+    }
+
     _phase = ClockPhase.submitting;
     _notify();
     try {
@@ -315,6 +561,11 @@ class TimeClockController extends ChangeNotifier {
       if (r.serverTime != null) clock.sync(r.serverTime!);
       await load(silent: true);
     } on ApiException catch (e) {
+      // The signal dropped between the face check and the send: keep it offline.
+      if (e.isNetwork && offline?.kit != null) {
+        await _saveOffline(direction, fix, faceCapture, warnLowAccuracy);
+        return;
+      }
       _outcome = switch (e) {
         _ when e.isConflict => PunchInfo(e.message),
         _ when e.fieldErrors.containsKey('location_consent') => const PunchNeedsConsent(),
@@ -345,6 +596,8 @@ class TimeClockController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _retry?.cancel();
+    offline?.removeListener(_notify);
     super.dispose();
   }
 }

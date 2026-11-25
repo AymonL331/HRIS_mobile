@@ -68,6 +68,10 @@ class SessionController extends ChangeNotifier {
   EnvConfig get env => _env.config;
   bool get isSignedIn => _state is SignedIn;
 
+  /// The app opened with no signal, on the saved user (offline clock-in).
+  bool _startedOffline = false;
+  bool get startedOffline => _startedOffline;
+
   User? get user => switch (_state) {
         SignedIn(:final user) => user,
         MustChangePassword(:final user) => user,
@@ -121,7 +125,11 @@ class SessionController extends ChangeNotifier {
       return;
     }
     try {
-      final user = await client.get<User>(Endpoints.me, parse: (d) => User.fromJson(d as Map<String, dynamic>));
+      Map<String, dynamic>? meJson;
+      final user = await client.get<User>(Endpoints.me, parse: (d) {
+        meJson = d as Map<String, dynamic>;
+        return User.fromJson(meJson!);
+      });
       // /auth/me is exempt from the server's per-request mobile check precisely
       // so the app can read the switch here: HR turned it off while the phone
       // was idle → sign out with the reason instead of failing at the first tap.
@@ -130,11 +138,23 @@ class SessionController extends ChangeNotifier {
         _set(const SignedOut(reason: 'Mobile app access has been disabled for this account. Ask HR if you think this is a mistake.'));
         return;
       }
+      // Kept for a cold start with no signal (offline clock-in, 2026-11-24).
+      if (meJson != null) {
+        _record = _record!.withUser(meJson!);
+        await _store.write(env.storageKey, _record!);
+      }
+      _startedOffline = false;
       _set(_routeFor(user));
     } on ApiException catch (e) {
       if (e.endsSession) {
         await _forget();
         _set(SignedOut(reason: e.isUnauthorized ? 'Your session has expired. Please sign in again.' : e.message));
+      } else if (e.isNetwork && _record?.user != null) {
+        // NO SIGNAL (brownout, no data — 2026-11-24): open with the user the server
+        // last described, so the Time Clock can still clock in offline. The first
+        // request that reaches the server again applies the session policy as usual.
+        _startedOffline = true;
+        _set(_routeFor(User.fromJson(_record!.user!)));
       } else {
         // Server unreachable or a transient error: keep the token for the next
         // cold start, but the app needs the server to work at all.
@@ -150,9 +170,11 @@ class SessionController extends ChangeNotifier {
       parse: (d) => d as Map<String, dynamic>,
     );
     final tenantJson = data['tenant'];
+    final userJson = data['user'];
     _record = SessionRecord(
       token: data['token'] as String,
       tenant: tenantJson is Map<String, dynamic> ? Tenant.fromJson(tenantJson) : null,
+      user: userJson is Map<String, dynamic> ? userJson : null,
     );
     await _store.write(env.storageKey, _record!);
     _set(_routeFor(User.fromJson(data['user'] as Map<String, dynamic>)));

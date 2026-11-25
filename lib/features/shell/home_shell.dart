@@ -49,6 +49,7 @@ import '../my_profile/my_profile_screen.dart';
 import '../overtime/overtime_api.dart';
 import '../overtime/overtime_screen.dart';
 import '../payslips/payslip_detail_screen.dart';
+import '../offline_clock/offline_clock_service.dart';
 import 'app_drawer.dart';
 import 'no_employee_screen.dart';
 
@@ -319,8 +320,19 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             final gate = _optional<LocationGateService>(ctx);
             final device = _optional<DeviceReadinessService>(ctx);
             final phone = _optional<PhoneStateService>(ctx);
+            final injectedApi = ctx.read<ClockApi?>();
+            final session = ctx.read<SessionController>();
             return TimeClockController(
-              api: ctx.read<ClockApi?>() ?? MobileClockApi(ctx.read<SessionController>()),
+              api: injectedApi ?? MobileClockApi(session),
+              // OFFLINE clock-in (2026-11-24): punches kept on the phone with no
+              // signal. Tests that inject a clock API inject this too (or none).
+              offline: injectedApi == null
+                  ? OfflineClockService(
+                      store: DeviceOfflineStore(envKey: () => session.env.storageKey),
+                      api: MobileOfflineClockApi(session),
+                      appVersion: session.appVersion,
+                    )
+                  : _optional<OfflineClockService?>(ctx),
               fixes: ctx.read<LocationFixService>(),
               tracking: tracking,
               reminders: _optional<ReminderSync?>(ctx),

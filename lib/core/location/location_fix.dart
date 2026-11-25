@@ -10,12 +10,18 @@ class LocationFix {
   final bool isMocked;
   final DateTime at;
 
+  /// The fix's own time as the location provider stamped it (UTC) — for a GPS
+  /// fix, the satellites' time, which the phone's clock setting does not change.
+  /// Offline clock-in (2026-11-24) sends it so the server can check WHEN.
+  final DateTime? gpsTime;
+
   const LocationFix({
     required this.latitude,
     required this.longitude,
     required this.accuracyM,
     required this.isMocked,
     required this.at,
+    this.gpsTime,
   });
 
   Map<String, dynamic> toJson() => {'latitude': latitude, 'longitude': longitude, 'accuracy': accuracyM};
@@ -57,8 +63,9 @@ class FixTimeout implements Exception {
 
 abstract class LocationFixService {
   /// A FRESH high-accuracy reading, never a cached one. Throws [FixTimeout]
-  /// when the device cannot produce one within the limit.
-  Future<LocationFix> acquire();
+  /// when the device cannot produce one within [timeLimit] (longer with no
+  /// mobile data: GPS then finds the satellites without help).
+  Future<LocationFix> acquire({Duration timeLimit = const Duration(seconds: 15)});
 }
 
 class GeolocatorFixService implements LocationFixService {
@@ -69,13 +76,13 @@ class GeolocatorFixService implements LocationFixService {
   const GeolocatorFixService();
 
   @override
-  Future<LocationFix> acquire() async {
+  Future<LocationFix> acquire({Duration timeLimit = const Duration(seconds: 15)}) async {
     Position p;
     try {
       p = await Geolocator.getCurrentPosition(
         locationSettings: AndroidSettings(
           accuracy: LocationAccuracy.best,
-          timeLimit: const Duration(seconds: 15),
+          timeLimit: timeLimit,
         ),
       );
     } on TimeoutException {
@@ -87,6 +94,7 @@ class GeolocatorFixService implements LocationFixService {
       accuracyM: p.accuracy,
       isMocked: p.isMocked || simulateMocked,
       at: DateTime.now(),
+      gpsTime: p.timestamp.toUtc(),
     );
   }
 }
