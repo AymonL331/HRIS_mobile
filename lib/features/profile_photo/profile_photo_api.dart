@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/auth/session_controller.dart';
+import '../../core/device/capture_context.dart';
 import '../../core/http/endpoints.dart';
 import 'profile_photo_models.dart';
 
@@ -23,7 +24,11 @@ abstract class ProfilePhotoApi {
 class MobileProfilePhotoApi implements ProfilePhotoApi {
   final SessionController session;
 
-  const MobileProfilePhotoApi(this.session);
+  /// Where + on what phone the photo was taken (server migration 134).
+  final CaptureContextCollector captureContext;
+
+  MobileProfilePhotoApi(this.session, {CaptureContextCollector? captureContext})
+      : captureContext = captureContext ?? CaptureContextCollector();
 
   @override
   Future<ProfilePhotoState> state() => session.guard(() => session.client.get(
@@ -32,13 +37,17 @@ class MobileProfilePhotoApi implements ProfilePhotoApi {
       ));
 
   @override
-  Future<ProfilePhotoState> submit(Uint8List jpeg) => session.guard(() => session.client.post(
-        Endpoints.profilePhoto,
-        body: {
-          'photo': {'type': 'image/jpeg', 'data': base64Encode(jpeg)},
-        },
-        parse: (d) => ProfilePhotoState.fromJson(d as Map<String, dynamic>?),
-      ));
+  Future<ProfilePhotoState> submit(Uint8List jpeg) async {
+    final capture = await captureContext.collect();
+    return session.guard(() => session.client.post(
+          Endpoints.profilePhoto,
+          body: {
+            'photo': {'type': 'image/jpeg', 'data': base64Encode(jpeg)},
+            'capture': capture,
+          },
+          parse: (d) => ProfilePhotoState.fromJson(d as Map<String, dynamic>?),
+        ));
+  }
 }
 
 /// Takes one photo. Null when the person backed out of the camera. The widget tests

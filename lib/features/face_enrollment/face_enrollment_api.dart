@@ -1,4 +1,5 @@
 import '../../core/auth/session_controller.dart';
+import '../../core/device/capture_context.dart';
 import '../../core/http/endpoints.dart';
 import '../face/face_models.dart';
 import 'face_enrollment_models.dart';
@@ -24,7 +25,11 @@ abstract class FaceEnrollmentApi {
 class MobileFaceEnrollmentApi implements FaceEnrollmentApi {
   final SessionController session;
 
-  const MobileFaceEnrollmentApi(this.session);
+  /// Where + on what phone the face was taken (server migration 134).
+  final CaptureContextCollector captureContext;
+
+  MobileFaceEnrollmentApi(this.session, {CaptureContextCollector? captureContext})
+      : captureContext = captureContext ?? CaptureContextCollector();
 
   @override
   Future<SelfEnrollmentState> state() => session.guard(() => session.client.get(
@@ -39,6 +44,11 @@ class MobileFaceEnrollmentApi implements FaceEnrollmentApi {
       ));
 
   @override
-  Future<void> submit(FaceCapture capture) =>
-      session.guard(() => session.client.post(Endpoints.faceEnrollment, body: capture.toEnrollmentJson()));
+  Future<void> submit(FaceCapture capture) async {
+    final where = await captureContext.collect();
+    await session.guard(() => session.client.post(
+          Endpoints.faceEnrollment,
+          body: {...capture.toEnrollmentJson(), 'capture': where},
+        ));
+  }
 }
