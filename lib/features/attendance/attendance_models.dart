@@ -266,6 +266,8 @@ class CorrectionRequest {
   final String status; // pending | approved | rejected | cancelled
   final String? reason;
   final String? proofPhotoUrl;
+  /// The approver's reason when it was rejected (null = none written).
+  final String? rejectionRemarks;
 
   const CorrectionRequest({
     required this.id,
@@ -275,6 +277,7 @@ class CorrectionRequest {
     required this.status,
     required this.reason,
     required this.proofPhotoUrl,
+    this.rejectionRemarks,
   });
 
   factory CorrectionRequest.fromJson(Map<String, dynamic> j) => CorrectionRequest(
@@ -285,6 +288,7 @@ class CorrectionRequest {
         status: (j['status'] ?? 'pending').toString(),
         reason: j['reason'] as String?,
         proofPhotoUrl: j['proof_photo_url'] as String?,
+        rejectionRemarks: j['rejection_remarks'] as String?,
       );
 }
 

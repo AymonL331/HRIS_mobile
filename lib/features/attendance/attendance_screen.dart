@@ -508,7 +508,25 @@ class _CorrectionsTable extends StatelessWidget {
             Text(ManilaTime.dateOnly(r.date), style: body),
             Text(when(r.requestedClockIn), style: mono),
             Text(when(r.requestedClockOut), style: mono),
-            StatusBadge(_labels[r.status] ?? r.status, tone: _tones[r.status] ?? StatusTone.neutral),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StatusBadge(_labels[r.status] ?? r.status, tone: _tones[r.status] ?? StatusTone.neutral),
+                // WHY it was rejected — the approver's remarks (2026-11-27).
+                if (r.status == 'rejected')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 200),
+                      child: Text(
+                        (r.rejectionRemarks ?? '').isEmpty ? 'No reason was given.' : 'Reason: ${r.rejectionRemarks}',
+                        style: TextStyle(fontSize: HrisType.xs, color: t.danger.text),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 200),
               child: Text((r.reason ?? '').isEmpty ? '—' : r.reason!, style: body),
